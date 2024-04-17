@@ -10,6 +10,9 @@
 #define LLVM_TRANSFORMS_UTILS_HELLOWORLD_H
 
 #include "llvm/IR/PassManager.h"
+#include "llvm/IR/IRBuilder.h"
+#include <string>
+#include <iostream>
 
 namespace llvm {
 
