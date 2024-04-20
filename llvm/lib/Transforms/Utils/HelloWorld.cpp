@@ -8,38 +8,81 @@
 
 #include "llvm/Transforms/Utils/HelloWorld.h"
 
-using namespace llvm;
+namespace llvm {
 
-PreservedAnalyses HelloWorldPass::run(Function &F,
-                                      FunctionAnalysisManager &AM) {
-  LLVMContext &context = F.getContext();
-  auto module = F.getParent();
-  Type* int32Type = Type::getInt32Ty(context);
-  PointerType* int32PtrType = PointerType::get(int32Type, 0);
-  FunctionType *printfType = FunctionType::get(int32Type,
-                                               {int32PtrType}, true);
-  FunctionCallee printfFunction = module->getOrInsertFunction("printf", printfType);
+PreservedAnalyses HelloWorldPass::run(Module &M, ModuleAnalysisManager &AM) 
+{
 
-  std::string functionName = F.getName().str();
-  std::string functionCallVarName = functionName + "_callCount";
-
-  GlobalVariable *functionCallCount = module->getGlobalVariable(functionName + functionCallVarName);
-  if (!functionCallCount) {
-      functionCallCount = new GlobalVariable(*module, int32Type, false, GlobalValue::CommonLinkage, 0, functionCallVarName);
-      functionCallCount->setInitializer(0);
+  // Initialize the IRBuilder
+  IRBuilder<> MBuilder(M.getContext());
+  Function *mainFunction = M.getFunction("main");
+  if (!mainFunction) {
+    errs() << "No main function found in the module\n";
   }
-  
-  Instruction *firstInstruction = &F.front().front();
-  IRBuilder<> builder(firstInstruction);
+  Type *Int64Ty = Type::getInt64Ty(M.getContext());
 
-  Value *loadedCallCount = builder.CreateLoad(int32Type,functionCallCount);
-  Value *addedCallCount = builder.CreateAdd(loadedCallCount, builder.getInt32(1));
-  builder.CreateStore(addedCallCount, functionCallCount);
+  std::vector<std::string> counterNames;
 
-  std::string printLog = functionName + " called %d times\n";
-  Value *formatStr = builder.CreateGlobalStringPtr(printLog);
-  builder.CreateCall(printfFunction, {formatStr, addedCallCount});
+  // Create a global variable to store the atomic counter for each function
+  for (auto &function : M.getFunctionList()) {
+    if (function.isDeclaration() 
+    || !function.hasFnAttribute(Attribute::MustProgress)) {
+      continue;
+    }
+    Value *atomic_counter = new GlobalVariable(M, Int64Ty, false, 
+    GlobalValue::CommonLinkage, ConstantInt::get(Int64Ty, 0), 
+    function.getName().str()+"_counter");
+    counterNames.push_back(function.getName().str()+"_counter");
+  }
 
-  // errs() << F.getName() << "\n";
+  // iterate over the functions
+  for (auto mit = M.begin(); mit != M.end(); ++mit) {
+    if (mit->isDeclaration() || !mit->hasFnAttribute(Attribute::MustProgress)) 
+    {
+      continue;
+    }
+    // iterate over the basic blocks
+    auto entryBlock = &mit->getEntryBlock();
+    Value *atomic_counter = M.getOrInsertGlobal(
+      mit->getName().str()+"_counter", Int64Ty
+    );
+    Value *one = ConstantInt::get(Int64Ty, 1);
+
+    MBuilder.SetInsertPoint(entryBlock->getFirstInsertionPt());
+    MBuilder.CreateAtomicRMW(
+      AtomicRMWInst::Add,
+      atomic_counter,
+      one,
+      MaybeAlign(),
+      AtomicOrdering::SequentiallyConsistent,
+      SyncScope::System
+    );
+  }
+
+  Function* printfFn = M.getFunction("printf");
+  if (!printfFn) {
+    errs() << "No printf function found in the module\n";
+  }
+
+  for (auto bbit = mainFunction->begin(); bbit != mainFunction->end(); bbit++) 
+  {
+    for (auto iit = bbit->begin(); iit != bbit->end(); iit ++) {
+      if ((std::string)iit->getOpcodeName()=="ret") {
+        MBuilder.SetInsertPoint(&*iit);
+        for (auto &counterName : counterNames) {
+          errs() << "counterName: " << counterName << "\n";
+          Value *counter = M.getGlobalVariable(counterName);
+          Value *formatStr = 
+          MBuilder.CreateGlobalStringPtr("Function %s was called %ld times\n");
+          Value *name = MBuilder.CreateGlobalStringPtr(counterName.c_str());
+          Value *loadCounter = MBuilder.CreateLoad(Int64Ty, counter);
+          Value *args[] = {formatStr, name, loadCounter};
+          MBuilder.CreateCall(printfFn, args);
+        }
+      }
+    }
+  }
   return PreservedAnalyses::all();
 }
+
+} // end llvm namespace
