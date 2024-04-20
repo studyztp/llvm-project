@@ -179,6 +179,7 @@ MODULE_PASS("tysan", TypeSanitizerPass())
 MODULE_PASS("verify", VerifierPass())
 MODULE_PASS("view-callgraph", CallGraphViewerPass())
 MODULE_PASS("wholeprogramdevirt", WholeProgramDevirtPass())
+MODULE_PASS("helloworld", HelloWorldPass())
 #undef MODULE_PASS
 
 #ifndef MODULE_PASS_WITH_PARAMS
@@ -446,8 +447,12 @@ FUNCTION_PASS("gc-lowering", GCLoweringPass())
 FUNCTION_PASS("guard-widening", GuardWideningPass())
 FUNCTION_PASS("gvn-hoist", GVNHoistPass())
 FUNCTION_PASS("gvn-sink", GVNSinkPass())
+<<<<<<< HEAD
 FUNCTION_PASS("helloworld", HelloWorldPass())
 FUNCTION_PASS("indirectbr-expand", IndirectBrExpandPass(*TM))
+=======
+FUNCTION_PASS("indirectbr-expand", IndirectBrExpandPass(TM))
+>>>>>>> e136b0ab9295 (modified helloworld to write out the function count at the end of the program)
 FUNCTION_PASS("infer-address-spaces", InferAddressSpacesPass())
 FUNCTION_PASS("infer-alignment", InferAlignmentPass())
 FUNCTION_PASS("inject-tli-mappings", InjectTLIMappings())
