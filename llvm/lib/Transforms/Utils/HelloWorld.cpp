@@ -26,37 +26,79 @@ PreservedAnalyses HelloWorldPass::run(Module &M, ModuleAnalysisManager &AM)
   // Create a global variable to store the atomic counter for each function
   for (auto &function : M.getFunctionList()) {
     if (function.isDeclaration() 
-    || !function.hasFnAttribute(Attribute::MustProgress)) {
+    || function.empty()) {
       continue;
     }
-    Value *atomic_counter = new GlobalVariable(M, Int64Ty, false, 
-    GlobalValue::CommonLinkage, ConstantInt::get(Int64Ty, 0), 
-    function.getName().str()+"_counter");
-    counterNames.push_back(function.getName().str()+"_counter");
+    if (function.getName().str() == roi_start_function_name) {
+      errs() << "Found the start function\n";
+      // Iterate over the basic blocks in the function
+      int counter = 0;
+      for (auto &block : function) {
+        // Iterate over the instructions in the block
+        for (auto &instr : block) {
+          // Increment the count for this block
+          errs() << "Instr: " << instr << "\n";
+          counter ++;
+          if (counter == roi_start_bb_offset) {
+            errs() << "Found the start basic block\n";
+            // setup atomic counter for roi begin
+            Value *atomic_counter = new GlobalVariable(M, Int64Ty, false, 
+            GlobalValue::CommonLinkage, ConstantInt::get(Int64Ty, 0),
+              "roi_begin_counter");
+            counterNames.push_back("roi_begin_counter");
+
+            Value *one = ConstantInt::get(Int64Ty, 1);
+
+            MBuilder.SetInsertPoint(block.getFirstInsertionPt());
+            MBuilder.CreateAtomicRMW(
+              AtomicRMWInst::Add,
+              atomic_counter,
+              one,
+              MaybeAlign(),
+              AtomicOrdering::SequentiallyConsistent,
+              SyncScope::System
+            );
+            break;
+          }
+
+        }
+      }
+    }
+    if (function.getName().str() == roi_end_function_name) {
+      errs() << "Found the end function\n";
+      int counter = 0;
+      for (auto &block : function) {
+        for (auto &instr : block) {
+          errs() << "Instr: " << instr << "\n";
+          counter ++;
+          if (counter == roi_end_bb_offset) {
+            errs() << "Found the end basic block\n";
+            // setup atomic counter
+            Value *atomic_counter = new GlobalVariable(M, Int64Ty, false, 
+            GlobalValue::CommonLinkage, ConstantInt::get(Int64Ty, 0),
+              "roi_end_counter");
+            counterNames.push_back("roi_end_counter");
+
+            Value *one = ConstantInt::get(Int64Ty, 1);
+
+            MBuilder.SetInsertPoint(block.getFirstInsertionPt());
+            MBuilder.CreateAtomicRMW(
+              AtomicRMWInst::Add,
+              atomic_counter,
+              one,
+              MaybeAlign(),
+              AtomicOrdering::SequentiallyConsistent,
+              SyncScope::System
+            );
+            break;
+          }
+        }
+      }
+    }
   }
 
-  // iterate over the functions
-  for (auto mit = M.begin(); mit != M.end(); ++mit) {
-    if (mit->isDeclaration() || !mit->hasFnAttribute(Attribute::MustProgress)) 
-    {
-      continue;
-    }
-    // iterate over the basic blocks
-    auto entryBlock = &mit->getEntryBlock();
-    Value *atomic_counter = M.getOrInsertGlobal(
-      mit->getName().str()+"_counter", Int64Ty
-    );
-    Value *one = ConstantInt::get(Int64Ty, 1);
-
-    MBuilder.SetInsertPoint(entryBlock->getFirstInsertionPt());
-    MBuilder.CreateAtomicRMW(
-      AtomicRMWInst::Add,
-      atomic_counter,
-      one,
-      MaybeAlign(),
-      AtomicOrdering::SequentiallyConsistent,
-      SyncScope::System
-    );
+  if (counterNames.empty()) {
+    errs() << "No counters were created for the functions\n";
   }
 
   Function* printfFn = M.getFunction("printf");
