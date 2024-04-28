@@ -11,7 +11,9 @@
 
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include <string>
 #include <vector>
@@ -21,12 +23,7 @@ namespace llvm {
 class Module;
 class HelloWorldPass : public PassInfoMixin<HelloWorldPass> {
 private:
-  std::string roi_start_function_name = "rank.omp_outlined";
-  int roi_start_bb_offset = 261;
-  int roi_start_function_count = 698538;
-  std::string roi_end_function_name = "rank.omp_outlined";
-  int roi_end_bb_offset = 118;
-  int roi_end_function_count = 28593311;
+  uint32_t threshold = 100000000;
 public:
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
 };
