@@ -5273,6 +5273,7 @@ def CodeAlign: StmtAttr {
   }];
 }
 
+<<<<<<< HEAD
 def ClspvLibclcBuiltin: InheritableAttr {
   let Spellings = [Clang<"clspv_libclc_builtin">];
   let Subjects = SubjectList<[Function]>;
@@ -5344,3 +5345,11 @@ def ModularFormat : InheritableAttr {
   let Subjects = SubjectList<[Function]>;
   let Documentation = [ModularFormatDocs];
 }
+=======
+def ProfilerHelperTag : InheritableAttr {
+  let Spellings = [GCC<"profiler_helper">];
+  let Subjects = SubjectList<[Function]>;
+  let Documentation = [Undocumented];
+  let SimpleHandler = 1;
+}
+>>>>>>> 3896d1718303 (added instrumentation function to not helper basic blocks)
