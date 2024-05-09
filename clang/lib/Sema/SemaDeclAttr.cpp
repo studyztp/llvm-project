@@ -701,6 +701,16 @@ static void checkAttrArgsAreCapabilityObjs(Sema &S, Decl *D,
 // Attribute Implementations
 //===----------------------------------------------------------------------===//
 
+static void handleProfilerHelperTagAttr(Sema &S, Decl *D, const ParsedAttr &AL)
+{
+  if (!isFunctionOrMethod(D)) {
+    S.Diag(D->getLocation(), diag::warn_attribute_wrong_decl_type)
+        << "'profiler_helper'" << ExpectedFunctionOrMethod;
+    return;
+  }
+  handleSimpleAttribute<ProfilerHelperTagAttr>(S, D, AL);
+}
+
 static void handlePtGuardedVarAttr(Sema &S, Decl *D, const ParsedAttr &AL) {
   if (!threadSafetyCheckIsPointer(S, D, AL))
     return;

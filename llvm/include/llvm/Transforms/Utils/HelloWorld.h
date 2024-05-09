@@ -15,6 +15,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/Transforms/Instrumentation.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include <string>
 #include <vector>
 
@@ -23,7 +24,30 @@ namespace llvm {
 class Module;
 class HelloWorldPass : public PassInfoMixin<HelloWorldPass> {
 private:
-  uint32_t threshold = 100000000;
+  bool emptyFunction(Function &F);
+  GlobalVariable* createGlobalUint64Array(
+    Module& M,
+    std::string variableName,
+    uint64_t size
+  );
+
+  // temp excluding list
+  std::vector<std::string> exclude_functions = {
+    "print_array",
+    "print_int",
+    "print_hi",
+    "if_reach_threshold",
+    "reset_counter",
+    "increase_counter",
+    "increment_array_element_at",
+    "reset_array_element_at",
+    "increase_array_by",
+    "reset_array",
+    "instrumentationFunction"
+  };
+
+  Function* createInstrumentationFunction(Module &M);
+  
 public:
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
 };
