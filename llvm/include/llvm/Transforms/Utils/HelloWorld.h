@@ -24,6 +24,9 @@ namespace llvm {
 class Module;
 class HelloWorldPass : public PassInfoMixin<HelloWorldPass> {
 private:
+  uint64_t totalFunctionCount;
+  uint64_t totalBasicBlockCount;
+  uint64_t threshold = 100000000;
   bool emptyFunction(Function &F);
   GlobalVariable* createGlobalUint64Array(
     Module& M,
