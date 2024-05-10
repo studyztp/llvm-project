@@ -43,9 +43,8 @@ GlobalVariable* HelloWorldPass::createGlobalUint64Array(
 {
   ArrayType* arrayTy = ArrayType::get(IntegerType::get(M.getContext(), 64), 
                                                                         size);
-  PointerType* pointerTy = PointerType::get(arrayTy, 0);
 
-  GlobalVariable* gvar_array_ptr = new GlobalVariable(
+  GlobalVariable* gvar_array = new GlobalVariable(
     M,
     arrayTy,
     false,
@@ -54,9 +53,9 @@ GlobalVariable* HelloWorldPass::createGlobalUint64Array(
     variableName
   );
   ConstantAggregateZero* const_array = ConstantAggregateZero::get(arrayTy);
-  gvar_array_ptr->setInitializer(const_array);
+  gvar_array->setInitializer(const_array);
 
-  return gvar_array_ptr;
+  return gvar_array;
 }
 
 Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
@@ -71,9 +70,11 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
     M
   );
 
-  BasicBlock*BB = BasicBlock::Create(M.getContext(), "entry", F);
+  BasicBlock* mainBB = BasicBlock::Create(M.getContext(), "instrumentation_entry", F);
+  BasicBlock* ifMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifMeet", F);
+  BasicBlock* ifNotMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifNotMeet", F);
   IRBuilder<> builder(M.getContext());
-  builder.SetInsertPoint(BB);
+  builder.SetInsertPoint(mainBB);
   Function::arg_iterator args = F->arg_begin();
   Value* basicBlockId = &*args++;
   Value* functionId = &*args++;
@@ -83,6 +84,14 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
   if (!counter) {
     errs() << "Global variable instructionCounter not found\n";
   }
+
+  Value* basicBlockVector = M.getGlobalVariable("basicBlockVector");
+
+  Value* functionVector = M.getGlobalVariable("functionVector");
+
+  Value* basicBlockDist = M.getGlobalVariable("basicBlockDist");
+
+  Value* functionDist = M.getGlobalVariable("functionDist");
 
   Function* IncreaseCounterFunction = M.getFunction("increase_counter");
   if (!IncreaseCounterFunction) {
@@ -94,12 +103,103 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
     errs() << "Function print_int not found\n";
   }
 
-  Value* variableName = 
-          builder.CreateGlobalStringPtr("global counter");
+  Function* ResetCounterFunction = M.getFunction("reset_counter");
+  if (!ResetCounterFunction) {
+    errs() << "Function reset_counter not found\n";
+  }
 
+  Function* IncreaseArrayElementAtFunction = M.getFunction("increment_array_element_at");
+  if (!IncreaseArrayElementAtFunction) {
+    errs() << "Function increment_array_element_at not found\n";
+  }
+
+  Function* PrintArrayFunction = M.getFunction("print_array");
+  if (!PrintArrayFunction) {
+    errs() << "Function print_array not found\n";
+  }
+
+  Function* ResetArrayElementAtFunction = M.getFunction("reset_array_element_at");
+  if (!ResetArrayElementAtFunction) {
+    errs() << "Function reset_array_element_at not found\n";
+  }
+
+  Function* IncreaseArrayByFunction = M.getFunction("increase_array_by");
+  if (!IncreaseArrayByFunction) {
+    errs() << "Function increase_array_by not found\n";
+  }
+
+  Function* ResetArrayFunction = M.getFunction("reset_array");
+  if (!ResetArrayFunction) {
+    errs() << "Function reset_array not found\n";
+  }
+
+  // can be atomic add
+  // increase global counter by bb IR inst count
   builder.CreateCall(IncreaseCounterFunction, {counter, basicBlockInstCount});
+  // increase basic block vector counter by 1
+  builder.CreateCall(IncreaseArrayElementAtFunction, {basicBlockVector, basicBlockId});
+  // increase basic block distance vector by bb IR inst count
+  builder.CreateCall(IncreaseArrayByFunction, 
+  {basicBlockDist, 
+  ConstantInt::get(Int32Ty, totalBasicBlockCount), 
+  basicBlockInstCount});
+  // reset the current basic block distance to 0
+  builder.CreateCall(ResetArrayElementAtFunction, {basicBlockDist, basicBlockId});
+  // increase function vector counter by 1
+  builder.CreateCall(IncreaseArrayByFunction,
+  {functionDist,
+  ConstantInt::get(Int32Ty, totalFunctionCount), 
+  basicBlockInstCount});
+  // reset the current function distance to 0
+  builder.CreateCall(ResetArrayElementAtFunction, {functionDist, functionId});
+
+  // can be atomic load
   Value* loadCounter = builder.CreateLoad(Int64Ty, counter);
-  builder.CreateCall(PrintIntFunction, {variableName, loadCounter});
+  // can be atomic comparison
+  Value* ifReachThreshold = 
+      builder.CreateICmpSGE(loadCounter, ConstantInt::get(Int64Ty, threshold));
+  builder.CreateCondBr(ifReachThreshold, ifMeet, ifNotMeet);
+
+  builder.SetInsertPoint(ifMeet);
+  // the helper function side should have mutex lock or we can wrap this 
+  // whole function with mutex calling from the profiler_helper.c
+  // print the global counter
+  builder.CreateCall(PrintIntFunction, {
+  builder.CreateGlobalStringPtr("global counter"),loadCounter});
+  // print the basic block vector
+  builder.CreateCall(PrintArrayFunction, 
+  {builder.CreateGlobalStringPtr("basic block vector"),
+  basicBlockVector, 
+  ConstantInt::get(Int32Ty, totalBasicBlockCount)});
+  // print the function vector
+  builder.CreateCall(PrintArrayFunction,
+  {builder.CreateGlobalStringPtr("function vector"),
+  functionVector,
+  ConstantInt::get(Int32Ty, totalFunctionCount)});
+  // print the basic block distance
+  builder.CreateCall(PrintArrayFunction,
+  {
+  builder.CreateGlobalStringPtr("basic block distance"),
+  basicBlockDist,
+  ConstantInt::get(Int32Ty, totalBasicBlockCount)});
+  // print the function distance
+  builder.CreateCall(PrintArrayFunction,
+  {
+  builder.CreateGlobalStringPtr("function distance"),
+  functionDist,
+  ConstantInt::get(Int32Ty, totalFunctionCount)});
+  // can set to atomic store later
+  // reset the global counter
+  builder.CreateCall(ResetCounterFunction, {counter});
+  // reset the basic block distance
+  builder.CreateCall(ResetArrayFunction, {basicBlockDist,
+  ConstantInt::get(Int32Ty, totalBasicBlockCount)});
+  // reset the function distance
+  builder.CreateCall(ResetArrayFunction, {functionDist,
+  ConstantInt::get(Int32Ty, totalFunctionCount)});
+  builder.CreateRetVoid();
+
+  builder.SetInsertPoint(ifNotMeet);
   builder.CreateRetVoid();
 
   return F;
@@ -126,7 +226,31 @@ PreservedAnalyses HelloWorldPass::run(Module &M, ModuleAnalysisManager &AM)
     errs() << "Global variable instructionCounter not found\n";
   }
 
-  // Get helper function
+
+  totalFunctionCount = 0;
+  totalBasicBlockCount = 0;
+
+  for (auto& function : M.getFunctionList()) {
+    if (emptyFunction(function) || function.isDeclaration()) 
+    {
+      continue;
+    }
+    if (std::find(exclude_functions.begin(), exclude_functions.end(), function.getName()) != exclude_functions.end()) {
+      errs() << "Skipping function: " << function.getName() << "\n";
+      continue;
+    }
+    totalFunctionCount++;
+    for (auto& block : function) {
+      totalBasicBlockCount++;
+    }
+  }
+
+  GlobalVariable* basicBlockVector = createGlobalUint64Array(M, "basicBlockVector", totalBasicBlockCount);
+  GlobalVariable* functionVector = createGlobalUint64Array(M, "functionVector", totalFunctionCount);
+  GlobalVariable* basicBlockDist = createGlobalUint64Array(M, "basicBlockDist", totalBasicBlockCount);
+  GlobalVariable* functionDist = createGlobalUint64Array(M, "functionDist", totalFunctionCount);
+
+  // Create the instrumentation function
   Function* instrumentationFunction = createInstrumentationFunction(M);
 
   for (auto& function : M.getFunctionList()) {
@@ -139,36 +263,29 @@ PreservedAnalyses HelloWorldPass::run(Module &M, ModuleAnalysisManager &AM)
       continue;
     }
     errs() << functionId << ": Function: " << function.getName() << "\n";
-    functionId++;
     for (auto& block : function) {
-      // errs() << "\t" << basicBlockId << ": BasicBlock: " << block.getName() << "\n";
-      basicBlockId++;
+      if (block.getName().str().find("instrumentation") != std::string::npos)
+      {
+        continue;
+      }
+      errs() << "\t" << basicBlockId << ": BasicBlock: " << block.getName() << "\n";
 
       // Create a function call to add the instruction count to the global
       builder.SetInsertPoint(block.getFirstInsertionPt());
-      Function* PrintHiFunction = M.getFunction("print_hi");
-      if (!PrintHiFunction) {
-        errs() << "Function print_hi not found\n";
-      }
-      // Value *counter = M.getGlobalVariable("instructionCounter");
+      uint64_t blockInstCount = block.size();
 
-      // Constant *BBinst = ConstantInt::get(Int64Ty, block.size());
-
-      // builder.CreateCall(IncreaseCounterFunction, {counter, BBinst});
-
-      // Value* format = builder.CreateGlobalStringPtr("%d \n");
-      // Value* counterValue = builder.CreateLoad(Int64Ty,counter);
-      // builder.CreateCall(PrintFunction, {format, counterValue});
       CallInst * addedCall = builder.CreateCall(instrumentationFunction,
           {ConstantInt::get(Type::getInt32Ty(M.getContext()), basicBlockId),
           ConstantInt::get(Type::getInt32Ty(M.getContext()), functionId),
-          ConstantInt::get(Type::getInt64Ty(M.getContext()), block.size())});
+          ConstantInt::get(Type::getInt64Ty(M.getContext()), blockInstCount)});
       InlineFunctionInfo ifi;
       auto res = InlineFunction(*addedCall, ifi);
       if (!res.isSuccess()) {
-        errs() << "Failed to inline print_hi\n";
+        errs() << "Failed to inline\n";
       }
+      basicBlockId++;
     }
+    functionId++;
   }
 
   return PreservedAnalyses::all();
