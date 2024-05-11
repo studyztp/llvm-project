@@ -141,18 +141,15 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
   // increase basic block distance vector by bb IR inst count
   builder.CreateCall(IncreaseArrayByFunction, 
   {basicBlockDist, 
-  ConstantInt::get(Int32Ty, totalBasicBlockCount), 
+  ConstantInt::get(Int32Ty, totalBasicBlockCount),
   basicBlockInstCount});
   // reset the current basic block distance to 0
   builder.CreateCall(ResetArrayElementAtFunction, {basicBlockDist, basicBlockId});
-  // increase function vector counter by 1
+  // increase function distance vector by bb IR inst count
   builder.CreateCall(IncreaseArrayByFunction,
   {functionDist,
   ConstantInt::get(Int32Ty, totalFunctionCount), 
   basicBlockInstCount});
-  // reset the current function distance to 0
-  builder.CreateCall(ResetArrayElementAtFunction, {functionDist, functionId});
-
   // can be atomic load
   Value* loadCounter = builder.CreateLoad(Int64Ty, counter);
   // can be atomic comparison
@@ -208,9 +205,12 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
 
 PreservedAnalyses HelloWorldPass::run(Module &M, ModuleAnalysisManager &AM) 
 {
+  std::error_code EC;
+  raw_fd_ostream out("basicBlockInfo.txt", EC, sys::fs::OF_Text);
+  if (EC) {
+    errs() << "Could not open file: " << EC.message() << "\n";
+  }
   IRBuilder<> builder(M.getContext());
-  uint32_t functionId = 0;
-  uint32_t basicBlockId = 0;
 
   // Create a global variable to store the instruction count
   Type *Int64Ty = Type::getInt64Ty(M.getContext());
@@ -226,10 +226,22 @@ PreservedAnalyses HelloWorldPass::run(Module &M, ModuleAnalysisManager &AM)
     errs() << "Global variable instructionCounter not found\n";
   }
 
+  Function* ResetArrayAtElementFunction = M.getFunction("reset_array_element_at");
+  if (!ResetArrayAtElementFunction) {
+    errs() << "Function reset_array_element_at not found\n";
+  }
+  Function* IncrementArrayElementAtFunction = M.getFunction("increment_array_element_at");
+  if (!IncrementArrayElementAtFunction) {
+    errs() << "Function increment_array_element_at not found\n";
+  }
+
 
   totalFunctionCount = 0;
   totalBasicBlockCount = 0;
+  uint32_t instLength = 0;
+  uint32_t counter = 0;
 
+  // find all basic blocks that will be instrumented
   for (auto& function : M.getFunctionList()) {
     if (emptyFunction(function) || function.isDeclaration()) 
     {
@@ -239,55 +251,100 @@ PreservedAnalyses HelloWorldPass::run(Module &M, ModuleAnalysisManager &AM)
       errs() << "Skipping function: " << function.getName() << "\n";
       continue;
     }
+
+    basicBlockInfo basicBlock;
+    basicBlock.functionName = function.getName();
+    basicBlock.functionId = totalFunctionCount;
+    
     totalFunctionCount++;
+    bool ifStartOfFunction = true;
     for (auto& block : function) {
+      if (ifStartOfFunction) {
+        basicBlock.ifStartOfFunction = true;
+        ifStartOfFunction = false;
+      }
+
+      instLength = block.size();
+      counter = 1;
+
+      for (Instruction& inst : block) {
+        if (counter >= instLength - 1) {
+          basicBlock.lastNotBranchInstruction = &inst;
+        }
+        counter++;
+      }
+      basicBlock.basicBlockName = block.getName();
+      basicBlock.basicBlockCount = instLength;
+      basicBlock.basicBlockId = totalBasicBlockCount;
+      basicBlock.function = &function;
+      basicBlock.basicBlock = &block;
       totalBasicBlockCount++;
+      basicBlockList.push_back(basicBlock);
     }
   }
 
+  // create arrays
   GlobalVariable* basicBlockVector = createGlobalUint64Array(M, "basicBlockVector", totalBasicBlockCount);
+  if (!basicBlockVector) {
+    errs() << "Global variable basicBlockVector not found\n";
+  }
   GlobalVariable* functionVector = createGlobalUint64Array(M, "functionVector", totalFunctionCount);
+  if (!functionVector) {
+    errs() << "Global variable functionVector not found\n";
+  }
   GlobalVariable* basicBlockDist = createGlobalUint64Array(M, "basicBlockDist", totalBasicBlockCount);
+  if (!basicBlockDist) {
+    errs() << "Global variable basicBlockDist not found\n";
+  }
   GlobalVariable* functionDist = createGlobalUint64Array(M, "functionDist", totalFunctionCount);
+  if (!functionDist) {
+    errs() << "Global variable functionDist not found\n";
+  }
 
   // Create the instrumentation function
   Function* instrumentationFunction = createInstrumentationFunction(M);
+  InlineFunctionInfo ifi;
 
-  for (auto& function : M.getFunctionList()) {
-    if (emptyFunction(function) || function.isDeclaration()) 
-    {
-      continue;
+  for (auto item : basicBlockList) {
+    builder.SetInsertPoint(item.lastNotBranchInstruction->getNextNode());
+
+    if (!InlineFunction(*(builder.CreateCall(instrumentationFunction, {
+      ConstantInt::get(Type::getInt32Ty(M.getContext()), item.basicBlockId),
+      ConstantInt::get(Type::getInt32Ty(M.getContext()), item.functionId),
+      ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
+    })), ifi).isSuccess()) {
+      errs() << "Failed to inline function\n";
     }
-    if (std::find(exclude_functions.begin(), exclude_functions.end(), function.getName()) != exclude_functions.end()) {
-      errs() << "Skipping function: " << function.getName() << "\n";
-      continue;
-    }
-    errs() << functionId << ": Function: " << function.getName() << "\n";
-    for (auto& block : function) {
-      if (block.getName().str().find("instrumentation") != std::string::npos)
+    if (item.ifStartOfFunction) {
+      if (!InlineFunction(*(builder.CreateCall(ResetArrayAtElementFunction,
       {
-        continue;
+        functionDist,
+        ConstantInt::get(Type::getInt32Ty(M.getContext()), item.functionId)
+      })), ifi).isSuccess()) {
+        errs() << "Failed to inline function\n";
       }
-      errs() << "\t" << basicBlockId << ": BasicBlock: " << block.getName() << "\n";
-
-      // Create a function call to add the instruction count to the global
-      builder.SetInsertPoint(block.getFirstInsertionPt());
-      uint64_t blockInstCount = block.size();
-
-      CallInst * addedCall = builder.CreateCall(instrumentationFunction,
-          {ConstantInt::get(Type::getInt32Ty(M.getContext()), basicBlockId),
-          ConstantInt::get(Type::getInt32Ty(M.getContext()), functionId),
-          ConstantInt::get(Type::getInt64Ty(M.getContext()), blockInstCount)});
-      InlineFunctionInfo ifi;
-      auto res = InlineFunction(*addedCall, ifi);
-      if (!res.isSuccess()) {
-        errs() << "Failed to inline\n";
+      if (!InlineFunction(*(builder.CreateCall(
+        IncrementArrayElementAtFunction,
+        {
+          functionVector,
+          ConstantInt::get(Type::getInt32Ty(M.getContext()), item.functionId)
+        }
+      )), ifi).isSuccess()) {
+        errs() << "Failed to inline function\n";
       }
-      basicBlockId++;
     }
-    functionId++;
   }
 
+  out << "functionID:functionName basicBlockID:basicBlockName basicBlockCount \n";
+
+  for (auto item : basicBlockList) {
+    out << item.functionId << ":" << item.functionName << " "  
+    << item.basicBlockId <<":"<< item.basicBlockName << " " 
+    << item.basicBlockCount << "\n";
+  }
+
+  out.close();
+  
   return PreservedAnalyses::all();
 }
 
