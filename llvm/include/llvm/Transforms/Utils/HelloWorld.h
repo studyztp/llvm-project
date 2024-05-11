@@ -16,17 +16,40 @@
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Support/FileSystem.h"
 #include <string>
 #include <vector>
+
 
 namespace llvm {
 
 class Module;
+
+struct basicBlockInfo {
+  // function related
+  std::string functionName;
+  uint32_t functionId;
+  bool ifStartOfFunction;
+
+  // basic block related
+  std::string basicBlockName;
+  uint64_t basicBlockCount;
+  uint32_t basicBlockId;
+  Instruction* lastNotBranchInstruction;
+
+  // pointers to the basic block and function
+  BasicBlock* basicBlock;
+  Function* function;
+};
+
 class HelloWorldPass : public PassInfoMixin<HelloWorldPass> {
 private:
   uint64_t totalFunctionCount;
   uint64_t totalBasicBlockCount;
   uint64_t threshold = 100000000;
+
+  std::vector<basicBlockInfo> basicBlockList;
+
   bool emptyFunction(Function &F);
   GlobalVariable* createGlobalUint64Array(
     Module& M,
