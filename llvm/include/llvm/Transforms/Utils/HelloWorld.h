@@ -50,6 +50,7 @@ private:
   std::vector<basicBlockInfo> basicBlockList;
 
   bool emptyFunction(Function &F);
+
   GlobalVariable* createGlobalUint64Array(
     Module& M,
     std::string variableName,
@@ -68,7 +69,9 @@ private:
     "reset_array_element_at",
     "increase_array_by",
     "reset_array",
-    "instrumentationFunction"
+    "instrumentationFunction",
+    "write_single_data",
+    "write_array_data"
   };
 
   Function* createInstrumentationFunction(Module &M);
