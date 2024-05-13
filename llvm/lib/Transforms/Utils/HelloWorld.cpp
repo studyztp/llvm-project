@@ -58,6 +58,7 @@ GlobalVariable* HelloWorldPass::createGlobalUint64Array(
   return gvar_array;
 }
 
+
 Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
   Type* VoidTy = Type::getVoidTy(M.getContext());
   Type* Int64Ty = Type::getInt64Ty(M.getContext());
@@ -88,93 +89,78 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
 
   Value* basicBlockDist = M.getGlobalVariable("basicBlockDist");
 
-  Function* IncreaseCounterFunction = M.getFunction("increase_counter");
-  if (!IncreaseCounterFunction) {
-    errs() << "Function increase_counter not found\n";
+  Function* writeSingleDataFunction = M.getFunction("write_single_data");
+  if (!writeSingleDataFunction) {
+    errs() << "Function write_single_data not found\n";
+  }
+  Function* writeArrayDataFunction = M.getFunction("write_array_data");
+  if (!writeArrayDataFunction) {
+    errs() << "Function write_array_data not found\n";
   }
 
-  Function* PrintIntFunction = M.getFunction("print_int");
-  if (!PrintIntFunction) {
-    errs() << "Function print_int not found\n";
-  }
-
-  Function* ResetCounterFunction = M.getFunction("reset_counter");
-  if (!ResetCounterFunction) {
-    errs() << "Function reset_counter not found\n";
-  }
-
-  Function* IncreaseArrayElementAtFunction = M.getFunction("increment_array_element_at");
-  if (!IncreaseArrayElementAtFunction) {
+  Function* incrementArrayElementAtFunction = M.getFunction("increment_array_element_at");
+  if (!incrementArrayElementAtFunction) {
     errs() << "Function increment_array_element_at not found\n";
   }
-
-  Function* PrintArrayFunction = M.getFunction("print_array");
-  if (!PrintArrayFunction) {
-    errs() << "Function print_array not found\n";
-  }
-
-  Function* ResetArrayElementAtFunction = M.getFunction("reset_array_element_at");
-  if (!ResetArrayElementAtFunction) {
+  Function* resetArrayElementAtFunction = M.getFunction("reset_array_element_at");
+  if (!resetArrayElementAtFunction) {
     errs() << "Function reset_array_element_at not found\n";
   }
-
-  Function* IncreaseArrayByFunction = M.getFunction("increase_array_by");
-  if (!IncreaseArrayByFunction) {
+  Function* increaseArrayByFunction = M.getFunction("increase_array_by");
+  if (!increaseArrayByFunction) {
     errs() << "Function increase_array_by not found\n";
   }
-
-  Function* ResetArrayFunction = M.getFunction("reset_array");
-  if (!ResetArrayFunction) {
+  Function* resetArrayFunction = M.getFunction("reset_array");
+  if (!resetArrayFunction) {
     errs() << "Function reset_array not found\n";
   }
 
   // can be atomic add
   // increase global counter by bb IR inst count
-  builder.CreateCall(IncreaseCounterFunction, {counter, basicBlockInstCount});
+  Value* loadOldCounter = builder.CreateLoad(Int64Ty, counter);
+  Value* addResult = builder.CreateAdd(loadOldCounter, basicBlockInstCount);
+  builder.CreateStore(addResult, counter);
 
   // increase basic block vector counter by 1
-  builder.CreateCall(IncreaseArrayElementAtFunction, {basicBlockVector, basicBlockId});
+  builder.CreateCall(incrementArrayElementAtFunction, {basicBlockVector, basicBlockId});
 
   // increase basic block distance vector by bb IR inst count
-  builder.CreateCall(IncreaseArrayByFunction, 
-  {basicBlockDist, 
-  ConstantInt::get(Int32Ty, totalBasicBlockCount),
-  basicBlockInstCount});
+  builder.CreateCall(increaseArrayByFunction, {basicBlockDist,
+  ConstantInt::get(Int32Ty, totalBasicBlockCount)
+  ,basicBlockInstCount});
 
   // reset the current basic block distance to 0
-  builder.CreateCall(ResetArrayElementAtFunction, {basicBlockDist, basicBlockId});
+  builder.CreateCall(resetArrayElementAtFunction, {basicBlockDist, basicBlockId});
 
   // can be atomic load
-  Value* loadCounter = builder.CreateLoad(Int64Ty, counter);
+  Value* loadNewCounter = builder.CreateLoad(Int64Ty, counter);
 
   // can be atomic comparison
   Value* ifReachThreshold = 
-      builder.CreateICmpSGE(loadCounter, ConstantInt::get(Int64Ty, threshold));
+      builder.CreateICmpSGE(loadNewCounter, ConstantInt::get(Int64Ty, threshold));
   builder.CreateCondBr(ifReachThreshold, ifMeet, ifNotMeet);
 
   builder.SetInsertPoint(ifMeet);
   // the helper function side should have mutex lock or we can wrap this 
   // whole function with mutex calling from the profiler_helper.c
   // print the global counter
-  builder.CreateCall(PrintIntFunction, {
-  builder.CreateGlobalStringPtr("global counter"),loadCounter});
+  builder.CreateCall(writeSingleDataFunction,
+  {builder.CreateGlobalStringPtr("instructionCounter"), loadNewCounter});
   // print the basic block vector
-  builder.CreateCall(PrintArrayFunction, 
+  builder.CreateCall(writeArrayDataFunction,
   {builder.CreateGlobalStringPtr("basic block vector"),
-  basicBlockVector, 
-  ConstantInt::get(Int32Ty, totalBasicBlockCount)});
+  basicBlockVector, ConstantInt::get(Int32Ty, totalBasicBlockCount)});
   // print the basic block distance
-  builder.CreateCall(PrintArrayFunction,
-  {
-  builder.CreateGlobalStringPtr("basic block distance"),
-  basicBlockDist,
-  ConstantInt::get(Int32Ty, totalBasicBlockCount)});
+  builder.CreateCall(writeArrayDataFunction,
+  {builder.CreateGlobalStringPtr("basic block distance"),
+  basicBlockDist, ConstantInt::get(Int32Ty, totalBasicBlockCount)});
 
   // can set to atomic store later
   // reset the global counter
-  builder.CreateCall(ResetCounterFunction, {counter});
+  builder.CreateStore(ConstantInt::get(Int64Ty, 0), counter);
   // reset the basic block distance
-  builder.CreateCall(ResetArrayFunction, {basicBlockDist,
+  builder.CreateCall(resetArrayFunction, 
+  {basicBlockDist, 
   ConstantInt::get(Int32Ty, totalBasicBlockCount)});
   builder.CreateRetVoid(); 
 
