@@ -326,12 +326,12 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
 
   modifyROIFunctions(M);
 
-  out << "functionID:functionName basicBlockID:basicBlockName basicBlockCount \n";
+  out << "[functionID:functionName] [basicBlockID:basicBlockName] [basicBlockCount] \n";
 
   for (auto item : basicBlockList) {
-    out << item.functionId << ":" << item.functionName << " "  
-    << item.basicBlockId <<":"<< item.basicBlockName << " " 
-    << item.basicBlockCount << "\n";
+    out << "[" << item.functionId << ":" << item.functionName << "] []"  
+    << item.basicBlockId <<":"<< item.basicBlockName << "] [" 
+    << item.basicBlockCount << "]\n";
   }
 
   out.close();
