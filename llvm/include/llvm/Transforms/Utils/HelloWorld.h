@@ -35,7 +35,6 @@ struct basicBlockInfo {
   std::string basicBlockName;
   uint64_t basicBlockCount;
   uint32_t basicBlockId;
-  Instruction* lastNotBranchInstruction;
 
   // pointers to the basic block and function
   BasicBlock* basicBlock;

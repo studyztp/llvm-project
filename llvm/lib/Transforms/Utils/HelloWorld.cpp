@@ -62,7 +62,7 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
   Type* VoidTy = Type::getVoidTy(M.getContext());
   Type* Int64Ty = Type::getInt64Ty(M.getContext());
   Type* Int32Ty = Type::getInt32Ty(M.getContext());
-  FunctionType* FTy = FunctionType::get(VoidTy, {Int32Ty, Int32Ty, Int64Ty}, false);
+  FunctionType* FTy = FunctionType::get(VoidTy, {Int32Ty, Int64Ty}, false);
   Function* F = Function::Create(
     FTy,
     GlobalValue::ExternalLinkage,
@@ -77,7 +77,6 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
   builder.SetInsertPoint(mainBB);
   Function::arg_iterator args = F->arg_begin();
   Value* basicBlockId = &*args++;
-  Value* functionId = &*args++;
   Value* basicBlockInstCount = &*args++;
 
   Value* counter = M.getGlobalVariable("instructionCounter");
@@ -87,11 +86,7 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
 
   Value* basicBlockVector = M.getGlobalVariable("basicBlockVector");
 
-  Value* functionVector = M.getGlobalVariable("functionVector");
-
   Value* basicBlockDist = M.getGlobalVariable("basicBlockDist");
-
-  Value* functionDist = M.getGlobalVariable("functionDist");
 
   Function* IncreaseCounterFunction = M.getFunction("increase_counter");
   if (!IncreaseCounterFunction) {
@@ -136,22 +131,22 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
   // can be atomic add
   // increase global counter by bb IR inst count
   builder.CreateCall(IncreaseCounterFunction, {counter, basicBlockInstCount});
+
   // increase basic block vector counter by 1
   builder.CreateCall(IncreaseArrayElementAtFunction, {basicBlockVector, basicBlockId});
+
   // increase basic block distance vector by bb IR inst count
   builder.CreateCall(IncreaseArrayByFunction, 
   {basicBlockDist, 
   ConstantInt::get(Int32Ty, totalBasicBlockCount),
   basicBlockInstCount});
+
   // reset the current basic block distance to 0
   builder.CreateCall(ResetArrayElementAtFunction, {basicBlockDist, basicBlockId});
-  // increase function distance vector by bb IR inst count
-  builder.CreateCall(IncreaseArrayByFunction,
-  {functionDist,
-  ConstantInt::get(Int32Ty, totalFunctionCount), 
-  basicBlockInstCount});
+
   // can be atomic load
   Value* loadCounter = builder.CreateLoad(Int64Ty, counter);
+
   // can be atomic comparison
   Value* ifReachThreshold = 
       builder.CreateICmpSGE(loadCounter, ConstantInt::get(Int64Ty, threshold));
@@ -168,33 +163,20 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
   {builder.CreateGlobalStringPtr("basic block vector"),
   basicBlockVector, 
   ConstantInt::get(Int32Ty, totalBasicBlockCount)});
-  // print the function vector
-  builder.CreateCall(PrintArrayFunction,
-  {builder.CreateGlobalStringPtr("function vector"),
-  functionVector,
-  ConstantInt::get(Int32Ty, totalFunctionCount)});
   // print the basic block distance
   builder.CreateCall(PrintArrayFunction,
   {
   builder.CreateGlobalStringPtr("basic block distance"),
   basicBlockDist,
   ConstantInt::get(Int32Ty, totalBasicBlockCount)});
-  // print the function distance
-  builder.CreateCall(PrintArrayFunction,
-  {
-  builder.CreateGlobalStringPtr("function distance"),
-  functionDist,
-  ConstantInt::get(Int32Ty, totalFunctionCount)});
+
   // can set to atomic store later
   // reset the global counter
   builder.CreateCall(ResetCounterFunction, {counter});
   // reset the basic block distance
   builder.CreateCall(ResetArrayFunction, {basicBlockDist,
   ConstantInt::get(Int32Ty, totalBasicBlockCount)});
-  // reset the function distance
-  builder.CreateCall(ResetArrayFunction, {functionDist,
-  ConstantInt::get(Int32Ty, totalFunctionCount)});
-  builder.CreateRetVoid();
+  builder.CreateRetVoid(); 
 
   builder.SetInsertPoint(ifNotMeet);
   builder.CreateRetVoid();
@@ -226,20 +208,8 @@ PreservedAnalyses HelloWorldPass::run(Module &M, ModuleAnalysisManager &AM)
     errs() << "Global variable instructionCounter not found\n";
   }
 
-  Function* ResetArrayAtElementFunction = M.getFunction("reset_array_element_at");
-  if (!ResetArrayAtElementFunction) {
-    errs() << "Function reset_array_element_at not found\n";
-  }
-  Function* IncrementArrayElementAtFunction = M.getFunction("increment_array_element_at");
-  if (!IncrementArrayElementAtFunction) {
-    errs() << "Function increment_array_element_at not found\n";
-  }
-
-
   totalFunctionCount = 0;
   totalBasicBlockCount = 0;
-  uint32_t instLength = 0;
-  uint32_t counter = 0;
 
   // find all basic blocks that will be instrumented
   for (auto& function : M.getFunctionList()) {
@@ -264,17 +234,8 @@ PreservedAnalyses HelloWorldPass::run(Module &M, ModuleAnalysisManager &AM)
         ifStartOfFunction = false;
       }
 
-      instLength = block.size();
-      counter = 1;
-
-      for (Instruction& inst : block) {
-        if (counter >= instLength - 1) {
-          basicBlock.lastNotBranchInstruction = &inst;
-        }
-        counter++;
-      }
       basicBlock.basicBlockName = block.getName();
-      basicBlock.basicBlockCount = instLength;
+      basicBlock.basicBlockCount = block.size();
       basicBlock.basicBlockId = totalBasicBlockCount;
       basicBlock.function = &function;
       basicBlock.basicBlock = &block;
@@ -288,17 +249,9 @@ PreservedAnalyses HelloWorldPass::run(Module &M, ModuleAnalysisManager &AM)
   if (!basicBlockVector) {
     errs() << "Global variable basicBlockVector not found\n";
   }
-  GlobalVariable* functionVector = createGlobalUint64Array(M, "functionVector", totalFunctionCount);
-  if (!functionVector) {
-    errs() << "Global variable functionVector not found\n";
-  }
   GlobalVariable* basicBlockDist = createGlobalUint64Array(M, "basicBlockDist", totalBasicBlockCount);
   if (!basicBlockDist) {
     errs() << "Global variable basicBlockDist not found\n";
-  }
-  GlobalVariable* functionDist = createGlobalUint64Array(M, "functionDist", totalFunctionCount);
-  if (!functionDist) {
-    errs() << "Global variable functionDist not found\n";
   }
 
   // Create the instrumentation function
@@ -306,32 +259,14 @@ PreservedAnalyses HelloWorldPass::run(Module &M, ModuleAnalysisManager &AM)
   InlineFunctionInfo ifi;
 
   for (auto item : basicBlockList) {
-    builder.SetInsertPoint(item.lastNotBranchInstruction->getNextNode());
-
-    if (!InlineFunction(*(builder.CreateCall(instrumentationFunction, {
+    builder.SetInsertPoint(item.basicBlock->getFirstNonPHI());
+    CallInst* main_instrument = builder.CreateCall(instrumentationFunction, {
       ConstantInt::get(Type::getInt32Ty(M.getContext()), item.basicBlockId),
-      ConstantInt::get(Type::getInt32Ty(M.getContext()), item.functionId),
       ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
-    })), ifi).isSuccess()) {
+    });
+    auto res = InlineFunction(*main_instrument, ifi);
+    if (!res.isSuccess()) {
       errs() << "Failed to inline function\n";
-    }
-    if (item.ifStartOfFunction) {
-      if (!InlineFunction(*(builder.CreateCall(ResetArrayAtElementFunction,
-      {
-        functionDist,
-        ConstantInt::get(Type::getInt32Ty(M.getContext()), item.functionId)
-      })), ifi).isSuccess()) {
-        errs() << "Failed to inline function\n";
-      }
-      if (!InlineFunction(*(builder.CreateCall(
-        IncrementArrayElementAtFunction,
-        {
-          functionVector,
-          ConstantInt::get(Type::getInt32Ty(M.getContext()), item.functionId)
-        }
-      )), ifi).isSuccess()) {
-        errs() << "Failed to inline function\n";
-      }
     }
   }
 
