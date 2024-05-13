@@ -5273,83 +5273,9 @@ def CodeAlign: StmtAttr {
   }];
 }
 
-<<<<<<< HEAD
-def ClspvLibclcBuiltin: InheritableAttr {
-  let Spellings = [Clang<"clspv_libclc_builtin">];
-  let Subjects = SubjectList<[Function]>;
-  let Documentation = [ClspvLibclcBuiltinDoc];
-  let SimpleHandler = 1;
-}
-
-def NoTrivialAutoVarInit: InheritableAttr {
-  let Spellings = [Declspec<"no_init_all">];
-  let Subjects = SubjectList<[Function, Tag]>;
-  let Documentation = [NoTrivialAutoVarInitDocs];
-  let SimpleHandler = 1;
-}
-
-def Atomic : StmtAttr {
-  let Spellings = [Clang<"atomic">];
-  let Args = [VariadicEnumArgument<"AtomicOptions", "ConsumedOption",
-                                   /*is_string=*/false,
-                                   ["remote_memory", "no_remote_memory",
-                                    "fine_grained_memory", "no_fine_grained_memory",
-                                    "ignore_denormal_mode", "no_ignore_denormal_mode"],
-                                   ["remote_memory", "no_remote_memory",
-                                    "fine_grained_memory", "no_fine_grained_memory",
-                                    "ignore_denormal_mode", "no_ignore_denormal_mode"]>];
-  let Subjects = SubjectList<[CompoundStmt], ErrorDiag, "compound statements">;
-  let Documentation = [AtomicDocs];
-  let StrictEnumParameters = 1;
-}
-
-def OpenACCRoutineAnnot : InheritableAttr {
-  // This attribute is used to mark that a function is targeted by a `routine`
-  // directive with a name for the purposes of checking the declaration later.
-  // We don't really need a link back to the declaration, as location is
-  // sufficient.
-  // We abuse the source locations on this a little, since we need two locations
-  // for various diagnostic purposes.  The 'begin' location is the location of
-  // the Routine directive. We are using the 'end' location for any 'bind'
-  // clauses, since this is needed for a diagnostic.
-  let Spellings = [];
-  let Subjects = SubjectList<[Function]>;
-  let Documentation = [InternalOnly];
-}
-
-def OpenACCRoutineDecl :InheritableAttr {
-  // This attribute represents the 'routine' directive when spelled without a
-  // 'name'.
-  let Spellings = [Pragma<"acc", "routine">];
-  let Subjects = SubjectList<[Function]>;
-  let SemaHandler = 0;
-  let HasCustomParsing = 1;
-  let HasCustomSerialization = 1;
-  let Documentation = [InternalOnly];
-  let AdditionalMembers = [{
-    llvm::SmallVector<const OpenACCClause *> Clauses;
-    void printPrettyPragma(raw_ostream &OS, const PrintingPolicy &Policy) const;
-  }];
-}
-
-def NonString : InheritableAttr {
-  let Spellings = [GCC<"nonstring">];
-  let Subjects = SubjectList<[Var, Field]>;
-  let Documentation = [NonStringDocs];
-}
-
-def ModularFormat : InheritableAttr {
-  let Spellings = [Clang<"modular_format">];
-  let Args = [IdentifierArgument<"ModularImplFn">, StringArgument<"ImplName">,
-              VariadicStringArgument<"Aspects">];
-  let Subjects = SubjectList<[Function]>;
-  let Documentation = [ModularFormatDocs];
-}
-=======
 def ProfilerHelperTag : InheritableAttr {
   let Spellings = [GCC<"profiler_helper">];
   let Subjects = SubjectList<[Function]>;
   let Documentation = [Undocumented];
   let SimpleHandler = 1;
 }
->>>>>>> 3896d1718303 (added instrumentation function to not helper basic blocks)
