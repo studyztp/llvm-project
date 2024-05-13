@@ -57,6 +57,8 @@ private:
     uint64_t size
   );
 
+  void modifyROIFunctions(Module &M);
+
   // temp excluding list
   std::vector<std::string> exclude_functions = {
     "print_array",
@@ -71,7 +73,9 @@ private:
     "reset_array",
     "instrumentationFunction",
     "write_single_data",
-    "write_array_data"
+    "write_array_data",
+    "roi_begin_",
+    "roi_end_",
   };
 
   Function* createInstrumentationFunction(Module &M);

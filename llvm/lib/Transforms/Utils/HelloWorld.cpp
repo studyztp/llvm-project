@@ -115,6 +115,8 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
     errs() << "Function reset_array not found\n";
   }
 
+  InlineFunctionInfo ifi;
+
   // can be atomic add
   // increase global counter by bb IR inst count
   Value* loadOldCounter = builder.CreateLoad(Int64Ty, counter);
@@ -122,14 +124,17 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
   builder.CreateStore(addResult, counter);
 
   // increase basic block vector counter by 1
+  CallInst* incrementBasicBlockVector = 
   builder.CreateCall(incrementArrayElementAtFunction, {basicBlockVector, basicBlockId});
 
   // increase basic block distance vector by bb IR inst count
+  CallInst* increaseBasicBlockDistance = 
   builder.CreateCall(increaseArrayByFunction, {basicBlockDist,
   ConstantInt::get(Int32Ty, totalBasicBlockCount)
   ,basicBlockInstCount});
 
   // reset the current basic block distance to 0
+  CallInst* resetBasicBlockDistanceOfCurrentBlock = 
   builder.CreateCall(resetArrayElementAtFunction, {basicBlockDist, basicBlockId});
 
   // can be atomic load
@@ -159,6 +164,7 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
   // reset the global counter
   builder.CreateStore(ConstantInt::get(Int64Ty, 0), counter);
   // reset the basic block distance
+  CallInst* resetBasicBlockDistance =
   builder.CreateCall(resetArrayFunction, 
   {basicBlockDist, 
   ConstantInt::get(Int32Ty, totalBasicBlockCount)});
@@ -167,7 +173,82 @@ Function* HelloWorldPass::createInstrumentationFunction(Module &M) {
   builder.SetInsertPoint(ifNotMeet);
   builder.CreateRetVoid();
 
+  std::vector<CallInst*> calls;
+
+  for (auto& BB : *F) {
+    for (auto& I : BB) {
+      if (isa<CallInst>(&I)) {
+        std::string name = cast<CallInst>(&I)->getCalledFunction()->getName().str();
+        if (name != "write_single_data" && name != "write_array_data") {
+          calls.push_back(cast<CallInst>(&I));
+        }
+      }
+    }
+  }
+
+  for (auto* call : calls) {
+    if(InlineFunction(*call, ifi).isSuccess()) {
+      errs() << "Successfully inlined function for" << call->getCalledFunction()->getName().str() << "\n";
+    } else {
+      errs() << "Failed to inline function for" << call->getCalledFunction()->getName().str() << "\n";
+    }
+  }
+
   return F;
+}
+
+void HelloWorldPass::modifyROIFunctions(Module &M) {
+  Function* roiBegin = M.getFunction("roi_begin_");
+  if (!roiBegin) {
+    errs() << "Function roi_begin_ not found\n";
+  }
+  Function* roiEnd = M.getFunction("roi_end_");
+  if (!roiEnd) {
+    errs() << "Function roi_end_ not found\n";
+  }
+
+  Function* resetArrayFunction = M.getFunction("reset_array");
+  if (!resetArrayFunction) {
+    errs() << "Function reset_array not found\n";
+  }
+  Function* writeSingleDataFunction = M.getFunction("write_single_data");
+  if (!writeSingleDataFunction) {
+    errs() << "Function write_single_data not found\n";
+  }
+  Function* writeArrayDataFunction = M.getFunction("write_array_data");
+  if (!writeArrayDataFunction) {
+    errs() << "Function write_array_data not found\n";
+  }
+
+  IRBuilder<> builder(M.getContext());
+
+  builder.SetInsertPoint(roiBegin->front().getFirstInsertionPt());
+  // reset all global instruction counter and basic block distance counter
+  builder.CreateStore(
+    ConstantInt::get(Type::getInt64Ty(M.getContext()), 0), 
+    M.getGlobalVariable("instructionCounter"));
+  builder.CreateCall(resetArrayFunction, {
+    M.getGlobalVariable("basicBlockDist"),
+    ConstantInt::get(Type::getInt32Ty(M.getContext()), totalBasicBlockCount)
+  });
+
+  builder.SetInsertPoint(roiEnd->front().getFirstInsertionPt());
+  // write all stats
+  builder.CreateCall(writeSingleDataFunction, {
+    builder.CreateGlobalStringPtr("instructionCounter"),
+    builder.CreateLoad(Type::getInt64Ty(M.getContext()), M.getGlobalVariable("instructionCounter"))
+  });
+  builder.CreateCall(writeArrayDataFunction, {
+    builder.CreateGlobalStringPtr("basic block vector"),
+    M.getGlobalVariable("basicBlockVector"),
+    ConstantInt::get(Type::getInt32Ty(M.getContext()), totalBasicBlockCount)
+  });
+  builder.CreateCall(writeArrayDataFunction, {
+    builder.CreateGlobalStringPtr("basic block distance"),
+    M.getGlobalVariable("basicBlockDist"),
+    ConstantInt::get(Type::getInt32Ty(M.getContext()), totalBasicBlockCount)
+  });
+
 }
 
 
@@ -242,19 +323,16 @@ PreservedAnalyses HelloWorldPass::run(Module &M, ModuleAnalysisManager &AM)
 
   // Create the instrumentation function
   Function* instrumentationFunction = createInstrumentationFunction(M);
-  InlineFunctionInfo ifi;
 
   for (auto item : basicBlockList) {
-    builder.SetInsertPoint(item.basicBlock->getFirstNonPHI());
+    builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
     CallInst* main_instrument = builder.CreateCall(instrumentationFunction, {
       ConstantInt::get(Type::getInt32Ty(M.getContext()), item.basicBlockId),
       ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
     });
-    auto res = InlineFunction(*main_instrument, ifi);
-    if (!res.isSuccess()) {
-      errs() << "Failed to inline function\n";
-    }
   }
+
+  modifyROIFunctions(M);
 
   out << "functionID:functionName basicBlockID:basicBlockName basicBlockCount \n";
 
