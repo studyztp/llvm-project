@@ -21,17 +21,17 @@ void PhaseBoundPass::getInformation(Module &M) {
     }
     std::string line;
     getline (readThisFile, line);
-    startMarkerFunctionId = std::stoi(line);
+    startMarkerFunctionId = static_cast<uint64_t>(std::stoi(line));
     getline (readThisFile, line);
-    startMarkerBBId = std::stoi(line);
+    startMarkerBBId = static_cast<uint64_t>(std::stoi(line));
     getline (readThisFile, line);
-    endMarkerFunctionId = std::stoi(line);
+    endMarkerFunctionId = static_cast<uint64_t>(std::stoi(line));
     getline (readThisFile, line);
-    endMarkerBBId = std::stoi(line);
+    endMarkerBBId = static_cast<uint64_t>(std::stoi(line));
     getline (readThisFile, line);
-    startMarkerCount = std::stoi(line);
+    startMarkerCount = static_cast<uint64_t>(std::stoi(line));
     getline (readThisFile, line);
-    endMarkerCount = std::stoi(line);
+    endMarkerCount = static_cast<uint64_t>(std::stoi(line));
     readThisFile.close();
 
     errs() << "startMarkerFunctionId: " << startMarkerFunctionId << "\n";
@@ -47,41 +47,47 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
     totalFunctionCount = 0;
     totalBasicBlockCount = 0;
 
-    for (Function &F : M) {
-        for (BasicBlock &BB : F) {
-            if (emptyFunction(F) || F.isDeclaration()) 
-            {
-                continue;
-            }
-            if (std::find(exclude_functions.begin(), exclude_functions.end(), F.getName()) != exclude_functions.end()) {
-                errs() << "Skipping function: " << F.getName() << "\n";
-                continue;
-            }
-            basicBlockInfo temp;
-            temp.functionName = F.getName();
-            temp.functionId = totalFunctionCount;
-            temp.basicBlockName = BB.getName();
-            temp.basicBlockCount = 0;
-            temp.basicBlockId = totalBasicBlockCount;
-            temp.basicBlock = &BB;
-            temp.function = &F;
-            if(startMarkerBBId == totalBasicBlockCount && startMarkerFunctionId == totalFunctionCount) {
-                temp.ifStartMark = true;
-            } else {
-                temp.ifStartMark = false;
-            }
-            
-            if(endMarkerBBId == totalBasicBlockCount && endMarkerFunctionId == totalFunctionCount) {
-                temp.ifEndMark = true;
-            } else {
-                temp.ifEndMark = false;
-            }
+  totalFunctionCount = 0;
+  totalBasicBlockCount = 0;
 
-            basicBlockList.push_back(temp);
-            totalBasicBlockCount++;
-        }
-        totalFunctionCount++;
+  // find all basic blocks that will be instrumented
+  for (auto& function : M.getFunctionList()) {
+    if (emptyFunction(function) || function.isDeclaration()) 
+    {
+      continue;
     }
+    if (std::find(exclude_functions.begin(), exclude_functions.end(), function.getName()) != exclude_functions.end()) {
+      errs() << "Skipping function: " << function.getName() << "\n";
+      continue;
+    }
+
+    basicBlockInfo basicBlock;
+    basicBlock.functionName = function.getName();
+    basicBlock.functionId = totalFunctionCount;
+    
+    totalFunctionCount++;
+    for (auto& block : function) {
+        basicBlock.basicBlockName = block.getName();
+        basicBlock.basicBlockCount = block.size();
+        basicBlock.basicBlockId = totalBasicBlockCount;
+        basicBlock.function = &function;
+        basicBlock.basicBlock = &block;
+        totalBasicBlockCount++;
+
+        if (basicBlock.functionId == startMarkerFunctionId && basicBlock.basicBlockId == startMarkerBBId) {
+            basicBlock.ifStartMark = true;
+        } else {
+            basicBlock.ifStartMark = false;
+        }
+        if (basicBlock.functionId == endMarkerFunctionId && basicBlock.basicBlockId == endMarkerBBId) {
+            basicBlock.ifEndMark = true;
+        } else {
+            basicBlock.ifEndMark = false;
+        }
+
+        basicBlockList.push_back(basicBlock);
+    }
+  }
 
 }
 
