@@ -1,6 +1,17 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#ifdef PROFILING
+#elif M5_SE
+#include "gem5/m5ops.h"
+#elif M5_FS
+#include "gem5/m5ops.h"
+#include "m5_mmap.h"
+#else
+#include "papi.h"
+#endif
+
+#ifdef PROFILING
 
 char filename[] = "profiler_output.txt";
 FILE *fptr = NULL;
@@ -49,18 +60,80 @@ void reset_array(uint64_t* arr, int n) {
     }
 }
 
+#endif
+
 __attribute__((profiler_helper))
 void roi_begin_() {
+#ifdef PROFILING
     is_profiling = 1;
     fptr = fopen(filename, "a");
     printf("Profiling started\n");
+#elif M5_SE
+    printf("M5_SE ROI started\n");
+#elif M5_FS
+    m5op_addr = 0x10010000;
+    map_m5_mem();
+    printf("M5_FS ROI started\n");
+#else
+    int retval = PAPI_library_init(PAPI_VER_CURRENT);
+    if (retval != PAPI_VER_CURRENT) {
+        printf("PAPI_library_init failed due to %d.\n", retval);
+    }
+    printf("ROI started\n");
+    printf("PAPI initialized\n");
+#endif
 }
 
 __attribute__((profiler_helper))
 void roi_end_() {
+#ifdef PROFILING
     is_profiling = 0;
     fclose(fptr);
     printf("Profiling ended\n");
+#elif M5_SE
+    printf("M5_SE ROI ended\n");
+#elif M5_FS
+    unmap_m5_mem();
+    printf("M5_FS ROI ended\n");
+#else
+    printf("ROI ended\n");
+#endif
+}
+
+__attribute__((profiler_helper))
+void start_marker() {
+#ifdef M5_SE
+    printf("M5_SE Start marker\n");
+    m5_work_begin(0, 0);
+#elif M5_FS
+    printf("M5_FS Start marker\n");
+    m5_work_begin_addr(0,0);
+#else
+    printf("Start marker\n");
+    char str[] = "0";
+    int retval = PAPI_hl_region_begin(str);
+    if (retval != PAPI_OK) {
+        printf("PAPI_hl_region_begin failed due to %d.\n", retval);
+    }
+#endif
+}
+
+__attribute__((profiler_helper))
+void end_marker() {
+#ifdef M5_SE
+    printf("M5_SE End marker\n");
+    m5_work_end(0, 0);
+#elif M5_FS
+    printf("M5_FS End marker\n");
+    m5_work_end(0,0);
+#else
+    char str[] = "0";
+    int retval = PAPI_hl_region_end(str);
+    if (retval != PAPI_OK) {
+        printf("PAPI_hl_region_end failed due to %d.\n", retval);
+    }
+    printf("End marker\n");
+#endif
 }
 
 
