@@ -1,19 +1,3 @@
-
-/*
-1. each basic block has a const global variable that stores its instruction
-    length
-2. every time a basic block is executed, it adds its instruction count to 
-    the global instruction counter atomically
-3. every function has a const global variable that stores the name of the 
-    function
-4. at the entry of every targeted function, it atomically add its name to a
-    global set
-5. when the global instruction counter reaches a certain threshold, it prints
-    the name of the functions in the global set and the total instruction count
-    then resets the global instruction counter.
-6. the global set is reset after the print
-*/
-
 #include "llvm/Transforms/Utils/PhaseAnalysis.h"
 
 namespace llvm {
@@ -329,7 +313,7 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
   out << "[functionID:functionName] [basicBlockID:basicBlockName] [basicBlockCount] \n";
 
   for (auto item : basicBlockList) {
-    out << "[" << item.functionId << ":" << item.functionName << "] []"  
+    out << "[" << item.functionId << ":" << item.functionName << "] ["  
     << item.basicBlockId <<":"<< item.basicBlockName << "] [" 
     << item.basicBlockCount << "]\n";
   }
