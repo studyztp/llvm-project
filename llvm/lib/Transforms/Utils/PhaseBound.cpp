@@ -14,7 +14,7 @@ bool PhaseBoundPass::emptyFunction(Function &F) {
 
 void PhaseBoundPass::getInformation(Module &M) {
     // I will use a super hacky way to get the information I need
-    std::string filename = "/home/studyztp/stuffs";
+    std::string filename = "/home/studyztp/stuffs/info.txt";
     std::ifstream readThisFile(filename);
     if (!readThisFile.is_open()) {
         errs() << "Could not open file: " << filename << "\n";
