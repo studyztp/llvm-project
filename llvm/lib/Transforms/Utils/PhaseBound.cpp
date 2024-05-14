@@ -91,8 +91,8 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
 
 }
 
-Function* createMarkerFunction(Module& M, std::string functionName,
-                        uint64_t threshold, Function* raiseFunction) {
+Function* PhaseBoundPass::createMarkerFunction(Module& M, std::string functionName,
+                        uint64_t threshold, std::string raiseFunction) {
     IRBuilder<> builder(M.getContext());
     Type* Int64Ty = Type::getInt64Ty(M.getContext());
     FunctionType* functionType = FunctionType::get(builder.getVoidTy(), {}, false);
@@ -109,6 +109,10 @@ Function* createMarkerFunction(Module& M, std::string functionName,
         ConstantInt::get(Int64Ty, 0),
         "instructionCounter"
     );
+    Function* raiseFunctionObject = M.getFunction(raiseFunction);
+    if(!raiseFunctionObject) {
+        errs() << raiseFunction <<" not found\n";
+    }
     if(!counter) {
         errs() << "counter not found\n";
     }
@@ -120,7 +124,7 @@ Function* createMarkerFunction(Module& M, std::string functionName,
     builder.SetInsertPoint(ifNotMeet);
     builder.CreateRetVoid();
     builder.SetInsertPoint(ifMeet);
-    builder.CreateCall(raiseFunction);
+    builder.CreateCall(raiseFunctionObject);
     builder.CreateRetVoid();
     return function;
 }
@@ -166,22 +170,12 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
 
     for (auto item : basicBlockList) {
         if(item.ifStartMark) {
-            errs() << "Start marker found\n";
-            Function* start_marker = M.getFunction("start_marker");
-            if(!start_marker) {
-                errs() << "start_marker not found\n";
-            }
-            Function* startFunction = createMarkerFunction(M, "start_function", startMarkerCount, start_marker);
+            Function* startFunction = createMarkerFunction(M, "start_function", startMarkerCount, "start_marker");
             builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             builder.CreateCall(startFunction);
         }
         if(item.ifEndMark) {
-            errs() << "End marker found\n";
-            Function* end_marker = M.getFunction("end_marker");
-            if(!end_marker) {
-                errs() << "end_marker not found\n";
-            }
-            Function* endFunction = createMarkerFunction(M, "end_function", endMarkerCount, end_marker);
+            Function* endFunction = createMarkerFunction(M, "end_function", endMarkerCount, "end_marker");
             builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             builder.CreateCall(endFunction);
         }
