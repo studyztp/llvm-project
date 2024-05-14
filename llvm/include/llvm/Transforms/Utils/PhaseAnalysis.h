@@ -71,6 +71,10 @@ private:
     "write_array_data",
     "roi_begin_",
     "roi_end_",
+    "start_marker",
+    "end_marker",
+    "start_function",
+    "end_function",
   };
 
   Function* createInstrumentationFunction(Module &M);

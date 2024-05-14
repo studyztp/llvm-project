@@ -91,6 +91,40 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
 
 }
 
+Function* createMarkerFunction(Module& M, std::string functionName,
+                        uint64_t threshold, Function* raiseFunction) {
+    IRBuilder<> builder(M.getContext());
+    Type* Int64Ty = Type::getInt64Ty(M.getContext());
+    FunctionType* functionType = FunctionType::get(builder.getVoidTy(), {}, false);
+    Function* function = Function::Create(functionType, GlobalValue::ExternalLinkage, functionName, M);
+    BasicBlock* entry = BasicBlock::Create(M.getContext(), "entry", function);
+    BasicBlock* ifNotMeet = BasicBlock::Create(M.getContext(), "ifNotMeet", function);
+    BasicBlock* ifMeet = BasicBlock::Create(M.getContext(), "ifMeet", function);
+    builder.SetInsertPoint(entry);
+    GlobalVariable* counter = new GlobalVariable(
+        M,
+        Int64Ty,
+        false,
+        GlobalValue::ExternalLinkage,
+        ConstantInt::get(Int64Ty, 0),
+        "instructionCounter"
+    );
+    if(!counter) {
+        errs() << "counter not found\n";
+    }
+    Value* counterValue = builder.CreateLoad(Int64Ty, counter);
+    Value* newCounter = builder.CreateAdd(counterValue, ConstantInt::get(Int64Ty, 1));
+    builder.CreateStore(newCounter, counter);
+    newCounter = builder.CreateLoad(Int64Ty, counter);
+    builder.CreateCondBr(builder.CreateICmpSGE(newCounter, ConstantInt::get(Int64Ty, threshold)), ifMeet, ifNotMeet);
+    builder.SetInsertPoint(ifNotMeet);
+    builder.CreateRetVoid();
+    builder.SetInsertPoint(ifMeet);
+    builder.CreateCall(raiseFunction);
+    builder.CreateRetVoid();
+    return function;
+}
+
 PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM) 
 {
 
@@ -133,43 +167,23 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
     for (auto item : basicBlockList) {
         if(item.ifStartMark) {
             errs() << "Start marker found\n";
-            builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
-            Value* counter = builder.CreateLoad(Int64Ty, startMarkerCounter);
-            Value* newCounter = builder.CreateAdd(counter, ConstantInt::get(Int64Ty, 1));
-            builder.CreateStore(newCounter, startMarkerCounter);
-            BasicBlock* StartIfNotMeet = BasicBlock::Create(M.getContext(), "StartIfNotMeet", item.function);
-            BasicBlock* StartIfMeet = BasicBlock::Create(M.getContext(), "StartIfMeet", item.function);
-            newCounter = builder.CreateLoad(Int64Ty, startMarkerCounter);
-            builder.CreateCondBr(builder.CreateICmpEQ(newCounter, ConstantInt::get(Int64Ty, startMarkerCount)), StartIfMeet, StartIfNotMeet);
-            builder.SetInsertPoint(StartIfNotMeet);
-            builder.CreateRetVoid();
-            builder.SetInsertPoint(StartIfMeet);
-            Function* roi_begin = M.getFunction("roi_begin_");
-            if(!roi_begin) {
-                errs() << "roi_begin_ not found\n";
+            Function* start_marker = M.getFunction("start_marker");
+            if(!start_marker) {
+                errs() << "start_marker not found\n";
             }
-            builder.CreateCall(roi_begin);
-            builder.CreateRetVoid();
+            Function* startFunction = createMarkerFunction(M, "start_function", startMarkerCount, start_marker);
+            builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
+            builder.CreateCall(startFunction);
         }
         if(item.ifEndMark) {
             errs() << "End marker found\n";
-            builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
-            Value* counter = builder.CreateLoad(Int64Ty, endMarkerCounter);
-            Value* newCounter = builder.CreateAdd(counter, ConstantInt::get(Int64Ty, 1));
-            builder.CreateStore(newCounter, endMarkerCounter);
-            BasicBlock* EndIfNotMeet = BasicBlock::Create(M.getContext(), "EndIfNotMeet", item.function);
-            BasicBlock* EndIfMeet = BasicBlock::Create(M.getContext(), "EndIfMeet", item.function);
-            newCounter = builder.CreateLoad(Int64Ty, endMarkerCounter);
-            builder.CreateCondBr(builder.CreateICmpEQ(newCounter, ConstantInt::get(Int64Ty, endMarkerCount)), EndIfMeet, EndIfNotMeet);
-            builder.SetInsertPoint(EndIfNotMeet);
-            builder.CreateRetVoid();
-            builder.SetInsertPoint(EndIfMeet);
-            Function* roi_end = M.getFunction("roi_end_");
-            if(!roi_end) {
-                errs() << "roi_end_ not found\n";
+            Function* end_marker = M.getFunction("end_marker");
+            if(!end_marker) {
+                errs() << "end_marker not found\n";
             }
-            builder.CreateCall(roi_end);
-            builder.CreateRetVoid();
+            Function* endFunction = createMarkerFunction(M, "end_function", endMarkerCount, end_marker);
+            builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
+            builder.CreateCall(endFunction);
         }
     }
 
