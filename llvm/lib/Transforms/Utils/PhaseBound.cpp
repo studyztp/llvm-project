@@ -14,7 +14,7 @@ bool PhaseBoundPass::emptyFunction(Function &F) {
 
 void PhaseBoundPass::getInformation(Module &M) {
     // I will use a super hacky way to get the information I need
-    std::string filename = "/home/studyztp/test_ground/experiments/hardware-profiling/ori_NPB/NPB3.4.2/NPB3.4-OMP/info.txt";
+    std::string filename = "/home/studyztp/stuffs";
     std::ifstream readThisFile(filename);
     if (!readThisFile.is_open()) {
         errs() << "Could not open file: " << filename << "\n";
