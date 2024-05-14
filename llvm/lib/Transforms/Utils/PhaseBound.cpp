@@ -110,7 +110,7 @@ Function* PhaseBoundPass::createMarkerFunction(Module& M, std::string functionNa
         false,
         GlobalValue::ExternalLinkage,
         ConstantInt::get(Int64Ty, 0),
-        "instructionCounter"
+        functionName + "_instructionCounter"
     );
     GlobalVariable* ifRasing = new GlobalVariable(
         M,
@@ -118,7 +118,7 @@ Function* PhaseBoundPass::createMarkerFunction(Module& M, std::string functionNa
         false,
         GlobalValue::ExternalLinkage,
         ConstantInt::get(Int1Ty, 1),
-        "ifRasingBool"
+        functionName + "ifRasingBool"
     );
     Function* raiseFunctionObject = M.getFunction(raiseFunction);
     if(!raiseFunctionObject) {
@@ -159,39 +159,19 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
 
     IRBuilder<> builder(M.getContext());
     Type *Int64Ty = Type::getInt64Ty(M.getContext());
-    GlobalVariable* startMarkerCounter = new GlobalVariable(
-        M,
-        Int64Ty,
-        false,
-        GlobalValue::ExternalLinkage,
-        ConstantInt::get(Int64Ty, 0),
-        "instructionCounter"
-    );
-    if(!startMarkerCounter) {
-        errs() << "startMarkerCounter not found\n";
-    }
-    GlobalVariable* endMarkerCounter = new GlobalVariable(
-        M,
-        Int64Ty,
-        false,
-        GlobalValue::ExternalLinkage,
-        ConstantInt::get(Int64Ty, 0),
-        "instructionCounter"
-    );
-    if(!endMarkerCounter) {
-        errs() << "endMarkerCounter not found\n";
-    }
 
     formBasicBlockList(M);
 
 
     for (auto item : basicBlockList) {
         if(item.ifStartMark) {
+            errs() << "Start marker found\n";
             Function* startFunction = createMarkerFunction(M, "start_function", startMarkerCount, "start_marker");
             builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             builder.CreateCall(startFunction);
         }
         if(item.ifEndMark) {
+            errs() << "End marker found\n";
             Function* endFunction = createMarkerFunction(M, "end_function", endMarkerCount, "end_marker");
             builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             builder.CreateCall(endFunction);
