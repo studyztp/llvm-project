@@ -17,23 +17,24 @@ namespace llvm {
 
 class Module;
 
-struct basicBlockInfo {
-  // function related
-  std::string functionName;
-  uint32_t functionId;
-  bool ifStartOfFunction;
-
-  // basic block related
-  std::string basicBlockName;
-  uint64_t basicBlockCount;
-  uint32_t basicBlockId;
-
-  // pointers to the basic block and function
-  BasicBlock* basicBlock;
-  Function* function;
-};
-
 class PhaseAnalysisPass : public PassInfoMixin<PhaseAnalysisPass> {
+public:
+  struct basicBlockInfo {
+    // function related
+    std::string functionName;
+    uint32_t functionId;
+    bool ifStartOfFunction;
+
+    // basic block related
+    std::string basicBlockName;
+    uint64_t basicBlockCount;
+    uint32_t basicBlockId;
+
+    // pointers to the basic block and function
+    BasicBlock* basicBlock;
+    Function* function;
+  };
+
 private:
   uint64_t totalFunctionCount;
   uint64_t totalBasicBlockCount;
@@ -41,7 +42,9 @@ private:
 
   std::vector<basicBlockInfo> basicBlockList;
 
+  // check if the function is empty by checking the number of 
   bool emptyFunction(Function &F);
+
 
   GlobalVariable* createGlobalUint64Array(
     Module& M,
