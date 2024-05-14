@@ -51,6 +51,8 @@ public:
   void getInformation(Module &M);
   void formBasicBlockList(Module& M);
   bool emptyFunction(Function &F);
+  Function* createMarkerFunction(Module& M, std::string functionName,
+                                uint64_t threshold, std::string raiseFunction);
   // temp excluding list
   std::vector<std::string> exclude_functions = {
     "print_array",
