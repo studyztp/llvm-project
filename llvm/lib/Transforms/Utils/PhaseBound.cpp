@@ -95,11 +95,14 @@ Function* PhaseBoundPass::createMarkerFunction(Module& M, std::string functionNa
                         uint64_t threshold, std::string raiseFunction) {
     IRBuilder<> builder(M.getContext());
     Type* Int64Ty = Type::getInt64Ty(M.getContext());
+    Type* Int1Ty = Type::getInt1Ty(M.getContext());
     FunctionType* functionType = FunctionType::get(builder.getVoidTy(), {}, false);
     Function* function = Function::Create(functionType, GlobalValue::ExternalLinkage, functionName, M);
     BasicBlock* entry = BasicBlock::Create(M.getContext(), "entry", function);
-    BasicBlock* ifNotMeet = BasicBlock::Create(M.getContext(), "ifNotMeet", function);
-    BasicBlock* ifMeet = BasicBlock::Create(M.getContext(), "ifMeet", function);
+    BasicBlock* ifRasingBB = BasicBlock::Create(M.getContext(), "ifRasing", function);
+    BasicBlock* ifNotRasingBB = BasicBlock::Create(M.getContext(), "ifNotRasing", function);
+    BasicBlock* ifNotMeetBB = BasicBlock::Create(M.getContext(), "ifNotMeet", function);
+    BasicBlock* ifMeetBB = BasicBlock::Create(M.getContext(), "ifMeet", function);
     builder.SetInsertPoint(entry);
     GlobalVariable* counter = new GlobalVariable(
         M,
@@ -109,6 +112,14 @@ Function* PhaseBoundPass::createMarkerFunction(Module& M, std::string functionNa
         ConstantInt::get(Int64Ty, 0),
         "instructionCounter"
     );
+    GlobalVariable* ifRasing = new GlobalVariable(
+        M,
+        Int1Ty,
+        false,
+        GlobalValue::ExternalLinkage,
+        ConstantInt::get(Int1Ty, 1),
+        "ifRasingBool"
+    );
     Function* raiseFunctionObject = M.getFunction(raiseFunction);
     if(!raiseFunctionObject) {
         errs() << raiseFunction <<" not found\n";
@@ -116,15 +127,21 @@ Function* PhaseBoundPass::createMarkerFunction(Module& M, std::string functionNa
     if(!counter) {
         errs() << "counter not found\n";
     }
+    Value *ifRasingValue = builder.CreateLoad(Int1Ty, ifRasing);
+    builder.CreateCondBr(ifRasingValue, ifRasingBB, ifNotRasingBB);
+    builder.SetInsertPoint(ifRasingBB);
     Value* counterValue = builder.CreateLoad(Int64Ty, counter);
     Value* newCounter = builder.CreateAdd(counterValue, ConstantInt::get(Int64Ty, 1));
     builder.CreateStore(newCounter, counter);
     newCounter = builder.CreateLoad(Int64Ty, counter);
-    builder.CreateCondBr(builder.CreateICmpSGE(newCounter, ConstantInt::get(Int64Ty, threshold)), ifMeet, ifNotMeet);
-    builder.SetInsertPoint(ifNotMeet);
+    builder.CreateCondBr(builder.CreateICmpSGE(newCounter, ConstantInt::get(Int64Ty, threshold)), ifMeetBB, ifNotMeetBB);
+    builder.SetInsertPoint(ifNotMeetBB);
     builder.CreateRetVoid();
-    builder.SetInsertPoint(ifMeet);
+    builder.SetInsertPoint(ifMeetBB);
     builder.CreateCall(raiseFunctionObject);
+    builder.CreateStore(ConstantInt::get(Int1Ty, 0), ifRasing);
+    builder.CreateRetVoid();
+    builder.SetInsertPoint(ifNotRasingBB);
     builder.CreateRetVoid();
     return function;
 }
