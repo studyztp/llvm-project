@@ -25,6 +25,7 @@ public:
     uint32_t functionId;
     bool ifStartMark;
     bool ifEndMark;
+    bool ifWarmupMark;
 
     // basic block related
     std::string basicBlockName;
