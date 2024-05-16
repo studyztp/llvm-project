@@ -25,20 +25,26 @@ void PhaseBoundPass::getInformation(Module &M) {
     getline (readThisFile, line);
     startMarkerBBId = static_cast<uint64_t>(std::stoi(line));
     getline (readThisFile, line);
+    startMarkerCount = static_cast<uint64_t>(std::stoi(line));
+    getline (readThisFile, line);
     endMarkerFunctionId = static_cast<uint64_t>(std::stoi(line));
     getline (readThisFile, line);
     endMarkerBBId = static_cast<uint64_t>(std::stoi(line));
     getline (readThisFile, line);
-    startMarkerCount = static_cast<uint64_t>(std::stoi(line));
-    getline (readThisFile, line);
     endMarkerCount = static_cast<uint64_t>(std::stoi(line));
+    getline (readThisFile, line);
+    warmupMarkerFunctionId = static_cast<uint64_t>(std::stoi(line));
+    getline (readThisFile, line);
+    warmupMarkerBBId = static_cast<uint64_t>(std::stoi(line));
+    getline (readThisFile, line);
+    warmupMarkerCount = static_cast<uint64_t>(std::stoi(line));
     readThisFile.close();
 
     errs() << "startMarkerFunctionId: " << startMarkerFunctionId << "\n";
     errs() << "startMarkerBBId: " << startMarkerBBId << "\n";
+    errs() << "startMarkerCount: " << startMarkerCount << "\n";
     errs() << "endMarkerFunctionId: " << endMarkerFunctionId << "\n";
     errs() << "endMarkerBBId: " << endMarkerBBId << "\n";
-    errs() << "startMarkerCount: " << startMarkerCount << "\n";
     errs() << "endMarkerCount: " << endMarkerCount << "\n";
     
 }
