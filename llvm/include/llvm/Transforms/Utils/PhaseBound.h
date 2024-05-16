@@ -78,6 +78,8 @@ public:
     "end_marker",
     "start_function",
     "end_function",
+    "warmup_marker",
+    "warmup_function",
   };
 
 public:
