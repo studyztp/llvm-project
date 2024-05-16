@@ -40,6 +40,14 @@ void PhaseBoundPass::getInformation(Module &M) {
     warmupMarkerCount = static_cast<uint64_t>(std::stoi(line));
     readThisFile.close();
 
+    if (warmupMarkerFunctionId == 0 && warmupMarkerBBId == 0 && warmupMarkerCount == 0) {
+        errs() << "No start marker found\n";
+    } else {
+        errs() << "warmupMarkerFunctionId" << warmupMarkerFunctionId << "\n";
+        errs() << "warmupMarkerBBId" << warmupMarkerBBId << "\n";
+        errs() << "warmupMarkerCount" << warmupMarkerCount << "\n";
+    }
+
     errs() << "startMarkerFunctionId: " << startMarkerFunctionId << "\n";
     errs() << "startMarkerBBId: " << startMarkerBBId << "\n";
     errs() << "startMarkerCount: " << startMarkerCount << "\n";
