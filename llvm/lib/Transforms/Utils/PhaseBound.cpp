@@ -90,6 +90,11 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
         } else {
             basicBlock.ifEndMark = false;
         }
+        if (basicBlock.functionId == warmupMarkerFunctionId && basicBlock.basicBlockId == warmupMarkerBBId) {
+            basicBlock.ifWarmupMark = true;
+        } else {
+            basicBlock.ifWarmupMark = false;
+        }
 
         basicBlockList.push_back(basicBlock);
     }
@@ -182,6 +187,12 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
             builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             builder.CreateCall(endFunction);
         }
+        if(item.ifWarmupMark) {
+            errs() << "Warmup marker found\n";
+            Function* warmupFunction = createMarkerFunction(M, "warmup_function", warmupMarkerCount, "warmup_marker");
+            builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
+            builder.CreateCall(warmupFunction);
+        }
     }
 
     out << "[functionID:functionName] [basicBlockID:basicBlockName] [basicBlockCount] \n";
@@ -192,6 +203,9 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
         }
         if (item.ifEndMark) {
             out << "End marker found\n";
+        }
+        if (item.ifWarmupMark) {
+            out << "Warmup marker found\n";
         }
         out << "[" << item.functionId << ":" << item.functionName << "] ["  
         << item.basicBlockId <<":"<< item.basicBlockName << "] [" 
