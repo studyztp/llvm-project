@@ -43,10 +43,13 @@ public:
 
   uint64_t startMarkerFunctionId;
   uint64_t startMarkerBBId;
+  uint64_t startMarkerCount;
   uint64_t endMarkerFunctionId;
   uint64_t endMarkerBBId;
-  uint64_t startMarkerCount;
   uint64_t endMarkerCount;
+  uint64_t warmupMarkerFunctionId;
+  uint64_t warmupMarkerBBId;
+  uint64_t warmupMarkerCount;
 
   void getInformation(Module &M);
   void formBasicBlockList(Module& M);
