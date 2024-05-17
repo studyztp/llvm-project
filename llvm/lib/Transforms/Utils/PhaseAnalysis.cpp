@@ -189,7 +189,7 @@ void PhaseAnalysisPass::modifyROIFunctions(Module &M) {
 
   IRBuilder<> builder(M.getContext());
 
-  builder.SetInsertPoint(roiBegin->back().getFirstInsertionPt());
+  builder.SetInsertPoint(roiBegin->back().getTerminator());
   builder.CreateCall(writeArrayDataFunction, {
     builder.CreateGlobalStringPtr("basic block vector"),
     M.getGlobalVariable("basicBlockVector"),
