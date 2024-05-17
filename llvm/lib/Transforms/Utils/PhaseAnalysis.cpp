@@ -78,9 +78,9 @@ Function* PhaseAnalysisPass::createInstrumentationFunction(Module &M) {
   if (!incrementArrayElementAtFunction) {
     errs() << "Function increment_array_element_at not found\n";
   }
-  Function* resetArrayElementAtFunction = M.getFunction("reset_array_element_at");
-  if (!resetArrayElementAtFunction) {
-    errs() << "Function reset_array_element_at not found\n";
+  Function* setArrayElementAtFunction = M.getFunction("set_array_element_at");
+  if (!setArrayElementAtFunction) {
+    errs() << "Function set_array_element_at not found\n";
   }
   Function* increaseArrayByFunction = M.getFunction("increase_array_by");
   if (!increaseArrayByFunction) {
@@ -111,7 +111,7 @@ Function* PhaseAnalysisPass::createInstrumentationFunction(Module &M) {
 
   // reset the current basic block distance to 0
   CallInst* resetBasicBlockDistanceOfCurrentBlock = 
-  builder.CreateCall(resetArrayElementAtFunction, {basicBlockDist, basicBlockId});
+  builder.CreateCall(setArrayElementAtFunction, {basicBlockDist, basicBlockId, addResult});
 
   // can be atomic load
   Value* loadNewCounter = builder.CreateLoad(Int64Ty, counter);
