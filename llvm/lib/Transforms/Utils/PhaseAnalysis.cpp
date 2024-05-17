@@ -103,13 +103,7 @@ Function* PhaseAnalysisPass::createInstrumentationFunction(Module &M) {
   CallInst* incrementBasicBlockVector = 
   builder.CreateCall(incrementArrayElementAtFunction, {basicBlockVector, basicBlockId});
 
-  // increase basic block distance vector by bb IR inst count
-  CallInst* increaseBasicBlockDistance = 
-  builder.CreateCall(increaseArrayByFunction, {basicBlockDist,
-  ConstantInt::get(Int32Ty, totalBasicBlockCount)
-  ,basicBlockInstCount});
-
-  // reset the current basic block distance to 0
+  // set the timestamp of the basic block to the global counter
   CallInst* resetBasicBlockDistanceOfCurrentBlock = 
   builder.CreateCall(setArrayElementAtFunction, {basicBlockDist, basicBlockId, addResult});
 
