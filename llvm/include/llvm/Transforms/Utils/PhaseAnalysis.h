@@ -77,6 +77,7 @@ private:
     "end_function",
     "warmup_marker",
     "warmup_function",
+    "set_array_element_at"
   };
 
   Function* createInstrumentationFunction(Module &M);
