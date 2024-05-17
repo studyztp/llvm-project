@@ -189,7 +189,7 @@ void PhaseAnalysisPass::modifyROIFunctions(Module &M) {
 
   IRBuilder<> builder(M.getContext());
 
-  builder.SetInsertPoint(roiBegin->front().getFirstInsertionPt());
+  builder.SetInsertPoint(roiBegin->back().getFirstInsertionPt());
   builder.CreateCall(writeSingleDataFunction, {
     builder.CreateGlobalStringPtr("instructionCounter"),
     builder.CreateLoad(Type::getInt64Ty(M.getContext()), M.getGlobalVariable("instructionCounter"))
