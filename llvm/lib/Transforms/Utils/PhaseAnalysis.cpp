@@ -190,18 +190,9 @@ void PhaseAnalysisPass::modifyROIFunctions(Module &M) {
   IRBuilder<> builder(M.getContext());
 
   builder.SetInsertPoint(roiBegin->back().getFirstInsertionPt());
-  builder.CreateCall(writeSingleDataFunction, {
-    builder.CreateGlobalStringPtr("instructionCounter"),
-    builder.CreateLoad(Type::getInt64Ty(M.getContext()), M.getGlobalVariable("instructionCounter"))
-  });
   builder.CreateCall(writeArrayDataFunction, {
     builder.CreateGlobalStringPtr("basic block vector"),
     M.getGlobalVariable("basicBlockVector"),
-    ConstantInt::get(Type::getInt32Ty(M.getContext()), totalBasicBlockCount)
-  });
-  builder.CreateCall(writeArrayDataFunction, {
-    builder.CreateGlobalStringPtr("basic block distance"),
-    M.getGlobalVariable("basicBlockDist"),
     ConstantInt::get(Type::getInt32Ty(M.getContext()), totalBasicBlockCount)
   });
   // reset all global instruction counter and basic block distance counter
