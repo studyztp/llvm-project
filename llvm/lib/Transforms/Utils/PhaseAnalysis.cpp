@@ -297,7 +297,7 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
   Function* instrumentationFunction = createInstrumentationFunction(M);
 
   for (auto item : basicBlockList) {
-    builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
+    builder.SetInsertPoint(item.basicBlock->getTerminator());
     CallInst* main_instrument = builder.CreateCall(instrumentationFunction, {
       ConstantInt::get(Type::getInt32Ty(M.getContext()), item.basicBlockId),
       ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
