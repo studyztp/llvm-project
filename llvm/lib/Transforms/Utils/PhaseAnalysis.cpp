@@ -297,7 +297,13 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
   Function* instrumentationFunction = createInstrumentationFunction(M);
 
   for (auto item : basicBlockList) {
-    builder.SetInsertPoint(item.basicBlock->getTerminator());
+    if (item.basicBlock->getTerminator()) {
+      builder.SetInsertPoint(item.basicBlock->getTerminator());
+    } else {
+      errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
+      builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
+    }
+    
     CallInst* main_instrument = builder.CreateCall(instrumentationFunction, {
       ConstantInt::get(Type::getInt32Ty(M.getContext()), item.basicBlockId),
       ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
