@@ -186,19 +186,34 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
         if(item.ifStartMark) {
             errs() << "Start marker found\n";
             Function* startFunction = createMarkerFunction(M, "start_function", startMarkerCount, "start_marker");
-            builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
+            if (item.basicBlock->getTerminator()) {
+                builder.SetInsertPoint(item.basicBlock->getTerminator());
+            } else {
+                errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
+                builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
+            }
             builder.CreateCall(startFunction);
         }
         if(item.ifEndMark) {
             errs() << "End marker found\n";
             Function* endFunction = createMarkerFunction(M, "end_function", endMarkerCount, "end_marker");
-            builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
+            if (item.basicBlock->getTerminator()) {
+                builder.SetInsertPoint(item.basicBlock->getTerminator());
+            } else {
+                errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
+                builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
+            }
             builder.CreateCall(endFunction);
         }
         if(item.ifWarmupMark) {
             errs() << "Warmup marker found\n";
             Function* warmupFunction = createMarkerFunction(M, "warmup_function", warmupMarkerCount, "warmup_marker");
-            builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
+            if (item.basicBlock->getTerminator()) {
+                builder.SetInsertPoint(item.basicBlock->getTerminator());
+            } else {
+                errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
+                builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
+            }
             builder.CreateCall(warmupFunction);
         }
     }
