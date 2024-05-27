@@ -112,6 +112,11 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
 
 Function* PhaseBoundPass::createMarkerFunction(Module& M, std::string functionName,
                         uint64_t threshold, std::string raiseFunction) {
+
+    Function* printfFunction = M.getFunction("printf");
+    if(!printfFunction) {
+        errs() << "printf not found\n";
+    }
     IRBuilder<> builder(M.getContext());
     Type* Int64Ty = Type::getInt64Ty(M.getContext());
     Type* Int1Ty = Type::getInt1Ty(M.getContext());
@@ -153,6 +158,13 @@ Function* PhaseBoundPass::createMarkerFunction(Module& M, std::string functionNa
     Value* newCounter = builder.CreateAdd(counterValue, ConstantInt::get(Int64Ty, 1));
     builder.CreateStore(newCounter, counter);
     newCounter = builder.CreateLoad(Int64Ty, counter);
+
+    // debug printf here
+    Value* formatString = builder.CreateGlobalStringPtr("%s Counter: %ld\n");
+    Value* functionNameValue = builder.CreateGlobalStringPtr(functionName);
+    Value* args[] = {formatString, functionNameValue, newCounter};
+    builder.CreateCall(printfFunction, args);
+
     builder.CreateCondBr(builder.CreateICmpSGE(newCounter, ConstantInt::get(Int64Ty, threshold)), ifMeetBB, ifNotMeetBB);
     builder.SetInsertPoint(ifNotMeetBB);
     builder.CreateRetVoid();
