@@ -12,10 +12,14 @@ bool PhaseBoundPass::emptyFunction(Function &F) {
     return count == 0;
 }
 
+cl::opt<std::string> InputFilename(cl::Positional, cl::desc("<input file>"), 
+                                                                cl::Required);
+
 void PhaseBoundPass::getInformation(Module &M) {
-    // I will use a super hacky way to get the information I need
-    std::string filename = "/home/studyztp/stuffs/info.txt";
+
+    std::string filename = InputFilename.c_str();
     std::ifstream readThisFile(filename);
+    errs() << "Reading file: " << filename << "\n";
     if (!readThisFile.is_open()) {
         errs() << "Could not open file: " << filename << "\n";
     }
