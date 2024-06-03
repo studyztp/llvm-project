@@ -8,6 +8,7 @@
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include <iostream>
 #include <fstream>
