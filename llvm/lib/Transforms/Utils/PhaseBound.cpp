@@ -12,13 +12,13 @@ bool PhaseBoundPass::emptyFunction(Function &F) {
     return count == 0;
 }
 
-cl::opt<std::string> InputFilename(
+cl::opt<std::string> PhaseBoundInputFilename(
     "input-file",
     cl::desc("<input file>"), 
     cl::ValueRequired
 );
                                 
-cl::opt<std::string> OutputFilename(
+cl::opt<std::string> PhaseBoundOutputFilename(
     "output-file", 
     cl::init("basicBlockList.txt"),
     cl::desc("<output file>"),
@@ -36,7 +36,7 @@ uint64_t readLineAsUInt64(std::ifstream& file) {
 
 void PhaseBoundPass::getInformation(Module &M) {
 
-    std::string filename = InputFilename.c_str();
+    std::string filename = PhaseBoundInputFilename.c_str();
     std::ifstream readThisFile(filename);
     if (!readThisFile.is_open()) {
         errs() << "Could not open file: " << filename << "\n";
@@ -182,7 +182,7 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
 
     std::error_code EC;
 
-    raw_fd_ostream out(OutputFilename.c_str(), EC, sys::fs::OF_Text);
+    raw_fd_ostream out(PhaseBoundOutputFilename.c_str(), EC, sys::fs::OF_Text);
     if (EC) {
         errs() << "Could not open file: " << EC.message() << "\n";
     }
