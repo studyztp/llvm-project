@@ -22,7 +22,7 @@ cl::opt<std::string> OutputFilename(
     "output-file", 
     cl::init("basicBlockList.txt"),
     cl::desc("<output file>"),
-    ValueRequired
+    cl::ValueRequired
 );
 
 uint64_t readLineAsUInt64(std::ifstream& file) {
