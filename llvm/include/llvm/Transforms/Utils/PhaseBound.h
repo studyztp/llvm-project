@@ -10,6 +10,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include <stdexcept>
 #include <iostream>
 #include <fstream>
 #include <string>
