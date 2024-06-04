@@ -18,7 +18,8 @@ cl::opt<std::string> InputFilename(cl::Positional, cl::desc("<input file>"),
 uint64_t readLineAsUInt64(std::ifstream& file) {
     std::string line;
     if (!std::getline(file, line)) {
-        throw std::runtime_error("Failed to read line from file");
+        errs() << "Could not read line\n";
+        return 0;
     }
     return static_cast<uint64_t>(std::stoi(line));
 }
@@ -32,21 +33,16 @@ void PhaseBoundPass::getInformation(Module &M) {
         return;
     }
 
-    try {
-        warmupMarkerFunctionId = readLineAsUInt64(readThisFile);
-        warmupMarkerBBId = readLineAsUInt64(readThisFile);
-        warmupMarkerCount = readLineAsUInt64(readThisFile);
-        startMarkerFunctionId = readLineAsUInt64(readThisFile);
-        startMarkerBBId = readLineAsUInt64(readThisFile);
-        startMarkerCount = readLineAsUInt64(readThisFile);
-        endMarkerFunctionId = readLineAsUInt64(readThisFile);
-        endMarkerBBId = readLineAsUInt64(readThisFile);
-        endMarkerCount = readLineAsUInt64(readThisFile);
-    } catch (const std::exception& e) {
-        errs() << "Error reading file: " << e.what() << "\n";
-        return;
-    }
-    
+    warmupMarkerFunctionId = readLineAsUInt64(readThisFile);
+    warmupMarkerBBId = readLineAsUInt64(readThisFile);
+    warmupMarkerCount = readLineAsUInt64(readThisFile);
+    startMarkerFunctionId = readLineAsUInt64(readThisFile);
+    startMarkerBBId = readLineAsUInt64(readThisFile);
+    startMarkerCount = readLineAsUInt64(readThisFile);
+    endMarkerFunctionId = readLineAsUInt64(readThisFile);
+    endMarkerBBId = readLineAsUInt64(readThisFile);
+    endMarkerCount = readLineAsUInt64(readThisFile);
+
     readThisFile.close();
 
     if (warmupMarkerFunctionId == 0 && warmupMarkerBBId == 0 && warmupMarkerCount == 0) {
