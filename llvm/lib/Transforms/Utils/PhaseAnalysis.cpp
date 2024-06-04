@@ -2,6 +2,13 @@
 
 namespace llvm {
 
+cl::opt<std::string> OutputFilename(
+  "output-file", 
+  cl::init("basicBlockList.txt"),
+  cl::desc("<output file>"),
+  cl::ValueRequired
+);
+
 bool PhaseAnalysisPass::emptyFunction(Function &F) {
   int count = 0;
   for (auto &block : F) {
@@ -227,7 +234,7 @@ void PhaseAnalysisPass::modifyROIFunctions(Module &M) {
 PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM) 
 {
   std::error_code EC;
-  raw_fd_ostream out("basicBlockInfo.txt", EC, sys::fs::OF_Text);
+  raw_fd_ostream out(OutputFilename.c_str(), EC, sys::fs::OF_Text);
   if (EC) {
     errs() << "Could not open file: " << EC.message() << "\n";
   }
