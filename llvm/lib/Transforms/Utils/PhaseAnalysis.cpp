@@ -224,7 +224,7 @@ void PhaseAnalysisPass::modifyROIFunctions(Module &M) {
 }
 
 cl::opt<std::string> PhaseAnalysisOutputFilename(
-  "output-file", 
+  "phase-analysis-output-file", 
   cl::init("basicBlockList.txt"),
   cl::desc("<output file>"),
   cl::ValueRequired

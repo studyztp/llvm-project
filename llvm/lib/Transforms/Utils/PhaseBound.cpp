@@ -13,13 +13,13 @@ bool PhaseBoundPass::emptyFunction(Function &F) {
 }
 
 cl::opt<std::string> PhaseBoundInputFilename(
-    "input-file",
+    "phase-bound-input-file",
     cl::desc("<input file>"), 
     cl::ValueRequired
 );
                                 
 cl::opt<std::string> PhaseBoundOutputFilename(
-    "output-file", 
+    "phase-bound-output-file", 
     cl::init("basicBlockList.txt"),
     cl::desc("<output file>"),
     cl::ValueRequired
