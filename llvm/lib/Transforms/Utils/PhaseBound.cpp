@@ -17,6 +17,12 @@ cl::opt<std::string> PhaseBoundInputFilename(
     cl::desc("<input file>"), 
     cl::ValueRequired
 );
+
+cl::opt<std::string> PhaseBoundBBOrderFilename(
+    "phase-bound-bb-order-file",
+    cl::desc("<bb order file>"), 
+    cl::ValueRequired
+);
                                 
 cl::opt<std::string> PhaseBoundOutputFilename(
     "phase-bound-output-file", 
@@ -73,52 +79,76 @@ void PhaseBoundPass::getInformation(Module &M) {
 }
 
 void PhaseBoundPass::formBasicBlockList(Module& M) {
-  totalFunctionCount = 0;
-  totalBasicBlockCount = 0;
 
-  // find all basic blocks that will be instrumented
-  for (auto& function : M.getFunctionList()) {
-    if (emptyFunction(function) || function.isDeclaration()) 
-    {
-      continue;
-    }
-    if (function.hasFnAttribute(Attribute::NoProfile)) {
-      errs() << "Skipping function: " << function.getName() << "\n";
-      continue;
+    std::string filename = PhaseBoundBBOrderFilename.c_str(); 
+    std::ifstream readThisFile(filename);
+    if (!readThisFile.is_open()) {
+        errs() << "Could not open file: " << filename << "\n";
+        return;
     }
 
-    basicBlockInfo basicBlock;
-    basicBlock.functionName = function.getName();
-    basicBlock.functionId = totalFunctionCount;
-    
-    totalFunctionCount++;
-    for (auto& block : function) {
-        basicBlock.basicBlockName = block.getName();
-        basicBlock.basicBlockCount = block.size();
-        basicBlock.basicBlockId = totalBasicBlockCount;
-        basicBlock.function = &function;
-        basicBlock.basicBlock = &block;
-        totalBasicBlockCount++;
+    std::regex e("\\[(\\d+):(.+?)\\] \\[(\\d+):(.+?)\\] \\[(\\d+)\\]");
+    std::string line;
 
-        if (basicBlock.functionId == startMarkerFunctionId && basicBlock.basicBlockId == startMarkerBBId) {
-            basicBlock.ifStartMark = true;
-        } else {
-            basicBlock.ifStartMark = false;
+    while (std::getline(readThisFile,line)) {
+        std::smatch match;
+        if (std::regex_search(line, match, e)) {
+            std::cout << "Function ID: " << match[1] << "\n";
+            std::cout << "Function Name: " << match[2] << "\n";
+            std::cout << "Basic Block ID: " << match[3] << "\n";
+            std::cout << "Basic Block Name: " << match[4] << "\n";
+            std::cout << "Instruction Number: " << match[5] << "\n";
         }
-        if (basicBlock.functionId == endMarkerFunctionId && basicBlock.basicBlockId == endMarkerBBId) {
-            basicBlock.ifEndMark = true;
-        } else {
-            basicBlock.ifEndMark = false;
-        }
-        if (basicBlock.functionId == warmupMarkerFunctionId && basicBlock.basicBlockId == warmupMarkerBBId) {
-            basicBlock.ifWarmupMark = true;
-        } else {
-            basicBlock.ifWarmupMark = false;
-        }
-
-        basicBlockList.push_back(basicBlock);
     }
-  }
+
+    readThisFile.close(); 
+
+    totalFunctionCount = 0;
+    totalBasicBlockCount = 0;
+
+    // find all basic blocks that will be instrumented
+    for (auto& function : M.getFunctionList()) {
+        if (emptyFunction(function) || function.isDeclaration()) 
+        {
+        continue;
+        }
+        if (function.hasFnAttribute(Attribute::NoProfile)) {
+        errs() << "Skipping function: " << function.getName() << "\n";
+        continue;
+        }
+
+        basicBlockInfo basicBlock;
+        basicBlock.functionName = function.getName();
+        basicBlock.functionId = totalFunctionCount;
+        
+        totalFunctionCount++;
+        for (auto& block : function) {
+            basicBlock.basicBlockName = block.getName();
+            basicBlock.basicBlockCount = block.size();
+            basicBlock.basicBlockId = totalBasicBlockCount;
+            basicBlock.function = &function;
+            basicBlock.basicBlock = &block;
+            totalBasicBlockCount++;
+
+            if (basicBlock.functionId == startMarkerFunctionId && basicBlock.basicBlockId == startMarkerBBId) {
+                basicBlock.ifStartMark = true;
+            } else {
+                basicBlock.ifStartMark = false;
+            }
+            if (basicBlock.functionId == endMarkerFunctionId && basicBlock.basicBlockId == endMarkerBBId) {
+                basicBlock.ifEndMark = true;
+            } else {
+                basicBlock.ifEndMark = false;
+            }
+            if (basicBlock.functionId == warmupMarkerFunctionId && basicBlock.basicBlockId == warmupMarkerBBId) {
+                basicBlock.ifWarmupMark = true;
+            } else {
+                basicBlock.ifWarmupMark = false;
+            }
+
+            basicBlockList.push_back(basicBlock);
+        }
+    }
 
 }
 
