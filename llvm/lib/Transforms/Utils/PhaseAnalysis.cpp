@@ -46,8 +46,8 @@ Function* PhaseAnalysisPass::createInstrumentationFunction(Module &M) {
     "instrumentationFunction",
     M
   );
-  F.addFnAttr(Attribute::NoInline);
-  F.addFnAttr(Attribute::NoProfile);
+  F->addFnAttr(Attribute::NoInline);
+  F->addFnAttr(Attribute::NoProfile);
 
   BasicBlock* mainBB = BasicBlock::Create(M.getContext(), "instrumentation_entry", F);
   BasicBlock* ifMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifMeet", F);
