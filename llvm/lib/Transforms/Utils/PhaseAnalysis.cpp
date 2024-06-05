@@ -169,14 +169,10 @@ void PhaseAnalysisPass::modifyROIFunctions(Module &M) {
   if (!roiBegin) {
     errs() << "Function roi_begin_ not found\n";
   }
-  for (auto attri: roiBegin->getAttributes()) {
-    errs() << "Attribute: " << attri.getAsString() << "\n";
-  }
   Function* roiEnd = M.getFunction("roi_end_");
   if (!roiEnd) {
     errs() << "Function roi_end_ not found\n";
   }
-
   Function* resetArrayFunction = M.getFunction("reset_array");
   if (!resetArrayFunction) {
     errs() << "Function reset_array not found\n";
@@ -265,7 +261,7 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
     {
       continue;
     }
-    if (std::find(exclude_functions.begin(), exclude_functions.end(), function.getName()) != exclude_functions.end()) {
+    if (function.hasFnAttribute(Attribute::NoProfile)) {
       errs() << "Skipping function: " << function.getName() << "\n";
       continue;
     }
