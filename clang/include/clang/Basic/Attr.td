@@ -4506,10 +4506,3 @@ def CodeAlign: StmtAttr {
     static constexpr int MaximumAlignment = 4096;
   }];
 }
-
-def ProfilerHelperTag : InheritableAttr {
-  let Spellings = [GCC<"profiler_helper">];
-  let Subjects = SubjectList<[Function]>;
-  let Documentation = [Undocumented];
-  let SimpleHandler = 1;
-}
