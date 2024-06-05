@@ -87,60 +87,47 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
         return;
     }
 
-    // std::regex e("\\[(\\d+):(.+?)\\] \\[(\\d+):(.+?)\\] \\[(\\d+)\\]");
-    // std::string line;
-    // std::string workingFunctionName="";
+    std::string line;
+    
+    std::regex e("\\[(\\d+):(.*?)\\]( \\[(\\d+):(.*?):(\\d+)\\])*");
+    std::smatch match;
+    std::string::const_iterator searchStart(line.cbegin());
+    std::smatch matchBasicBlock;
+    std::regex eBasicBlock("\\[(\\d+):(.*?):(\\d+)\\]");
 
-
-    // while (std::getline(readThisFile,line)) {
-    //     if (std::regex_search(line, match, e)) {
-    //         std::cout << "Function ID: " << match[1] << "\n";
-    //         // std::cout << "Function Name: " << match[2] << "\n";
-    //         // std::cout << "Basic Block ID: " << match[3] << "\n";
-    //         // std::cout << "Basic Block Name: " << match[4] << "\n";
-    //         // std::cout << "Instruction Number: " << match[5] << "\n";
-    //         if (workingFunctionName != match[2]) {
-    //             workingFunctionName = match[2];
-    //             errs() << "Working on function: " << workingFunctionName << "\n";
-    //             Function* function = M.getFunction(workingFunctionName);
-    //             if (!function) {
-    //                 errs() << "Could not find function: " << workingFunctionName << "\n";
-    //                 continue;
-    //             }
-    //         }
-
-
-    //     }
-    // }
-
-    readThisFile.close(); 
-
-    totalFunctionCount = 0;
-    totalBasicBlockCount = 0;
-
-    // find all basic blocks that will be instrumented
-    for (auto& function : M.getFunctionList()) {
-        if (emptyFunction(function) || function.isDeclaration()) 
-        {
-        continue;
-        }
-        if (function.hasFnAttribute(Attribute::NoProfile)) {
-        errs() << "Skipping function: " << function.getName() << "\n";
-        continue;
-        }
-
+    while (std::regex_search(line, match, e)) {
         basicBlockInfo basicBlock;
-        basicBlock.functionName = function.getName();
-        basicBlock.functionId = totalFunctionCount;
-        
-        totalFunctionCount++;
-        for (auto& block : function) {
-            basicBlock.basicBlockName = block.getName();
-            basicBlock.basicBlockCount = block.size();
-            basicBlock.basicBlockId = totalBasicBlockCount;
-            basicBlock.function = &function;
+        uint32_t functionId = std::stoi(match[1]);
+        std::string functionName = match[2];
+
+        Function* function = M.getFunction(functionName);
+        if (!function) {
+            errs() << "Could not find function: " << functionName << "\n";
+            continue;
+        }
+
+        basicBlock.functionId = functionId;
+        basicBlock.functionName = functionName;
+        basicBlock.function = function;
+
+        for (auto& block: function) {
+            std::regex_search(searchStart, line.cend(), matchBasicBlock, eBasicBlock);
+            uint32_t basicBlockId = std::stoi(matchBasicBlock[1]);
+            if (block.getName() != matchBasicBlock[2]) {
+                errs() << "Could not find basic block: " << matchBasicBlock[2] << "\n";
+                continue;
+            } else {
+                basicBlock.basicBlockId = basicBlockId;
+                basicBlock.basicBlockName = matchBasicBlock[2];
+            }
+            uint64_t basicBlockCount = std::stoi(matchBasicBlock[3]);
+            if (block.size() != basicBlockCount) {
+                errs() << "Basic block count mismatch: " << basicBlockCount << " " << block.size() << "\n";
+                continue;
+            } else {
+                basicBlock.basicBlockCount = basicBlockCount;
+            }
             basicBlock.basicBlock = &block;
-            totalBasicBlockCount++;
 
             if (basicBlock.functionId == startMarkerFunctionId && basicBlock.basicBlockId == startMarkerBBId) {
                 basicBlock.ifStartMark = true;
@@ -159,9 +146,13 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
             }
 
             basicBlockList.push_back(basicBlock);
+            
         }
+
+
     }
 
+    readThisFile.close(); 
 }
 
 Function* PhaseBoundPass::createMarkerFunction(Module& M, std::string functionName,
@@ -273,21 +264,19 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
         }
     }
 
-    out << "[functionID:functionName] [basicBlockID:basicBlockName] [basicBlockCount] \n";
+    out << "[functionID:functionName] [basicBlockID:basicBlockName:basicBlockIRInstCount] \n";
+
+    std::string workingFunctionName = "";
 
     for (auto item : basicBlockList) {
-        if (item.ifStartMark) {
-            out << "Start marker found\n";
+        if (workingFunctionName != item.functionName) {
+        if (workingFunctionName != ""){
+            out << "\n";
         }
-        if (item.ifEndMark) {
-            out << "End marker found\n";
+        workingFunctionName = item.functionName;
+        out << "[" << item.functionId << ":" << item.functionName << "]";
         }
-        if (item.ifWarmupMark) {
-            out << "Warmup marker found\n";
-        }
-        out << "[" << item.functionId << ":" << item.functionName << "] ["  
-        << item.basicBlockId <<":"<< item.basicBlockName << "] [" 
-        << item.basicBlockCount << "]\n";
+        out << " [" << item.basicBlockId << ":" << item.basicBlockName << ":" << item.basicBlockCount << "] ";
     }
 
     out.close();
