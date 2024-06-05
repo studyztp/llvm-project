@@ -87,19 +87,31 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
         return;
     }
 
-    std::regex e("\\[(\\d+):(.+?)\\] \\[(\\d+):(.+?)\\] \\[(\\d+)\\]");
-    std::string line;
+    // std::regex e("\\[(\\d+):(.+?)\\] \\[(\\d+):(.+?)\\] \\[(\\d+)\\]");
+    // std::string line;
+    // std::string workingFunctionName="";
 
-    while (std::getline(readThisFile,line)) {
-        std::smatch match;
-        if (std::regex_search(line, match, e)) {
-            std::cout << "Function ID: " << match[1] << "\n";
-            std::cout << "Function Name: " << match[2] << "\n";
-            std::cout << "Basic Block ID: " << match[3] << "\n";
-            std::cout << "Basic Block Name: " << match[4] << "\n";
-            std::cout << "Instruction Number: " << match[5] << "\n";
-        }
-    }
+
+    // while (std::getline(readThisFile,line)) {
+    //     if (std::regex_search(line, match, e)) {
+    //         std::cout << "Function ID: " << match[1] << "\n";
+    //         // std::cout << "Function Name: " << match[2] << "\n";
+    //         // std::cout << "Basic Block ID: " << match[3] << "\n";
+    //         // std::cout << "Basic Block Name: " << match[4] << "\n";
+    //         // std::cout << "Instruction Number: " << match[5] << "\n";
+    //         if (workingFunctionName != match[2]) {
+    //             workingFunctionName = match[2];
+    //             errs() << "Working on function: " << workingFunctionName << "\n";
+    //             Function* function = M.getFunction(workingFunctionName);
+    //             if (!function) {
+    //                 errs() << "Could not find function: " << workingFunctionName << "\n";
+    //                 continue;
+    //             }
+    //         }
+
+
+    //     }
+    // }
 
     readThisFile.close(); 
 
