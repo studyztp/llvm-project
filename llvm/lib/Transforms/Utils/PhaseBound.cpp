@@ -113,7 +113,7 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
         for (auto& block: function->getBasicBlockList()) {
             std::regex_search(searchStart, line.cend(), matchBasicBlock, eBasicBlock);
             uint32_t basicBlockId = std::stoi(matchBasicBlock[1]);
-            if (block.getName().c_str() != matchBasicBlock[2]) {
+            if (block.getName().str() != matchBasicBlock[2]) {
                 errs() << "Could not find basic block: " << matchBasicBlock[2] << "\n";
                 continue;
             } else {
