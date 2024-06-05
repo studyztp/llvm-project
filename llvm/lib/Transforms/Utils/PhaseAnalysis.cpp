@@ -46,6 +46,8 @@ Function* PhaseAnalysisPass::createInstrumentationFunction(Module &M) {
     "instrumentationFunction",
     M
   );
+  F.addFnAttr(Attribute::NoInline);
+  F.addFnAttr(Attribute::NoProfile);
 
   BasicBlock* mainBB = BasicBlock::Create(M.getContext(), "instrumentation_entry", F);
   BasicBlock* ifMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifMeet", F);
@@ -317,12 +319,19 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
 
   modifyROIFunctions(M);
 
-  out << "[functionID:functionName] [basicBlockID:basicBlockName] [basicBlockCount] \n";
+  out << "[functionID:functionName] [basicBlockID:basicBlockName:basicBlockIRInstCount] \n";
+
+  std::string workingFunctionName = "";
 
   for (auto item : basicBlockList) {
-    out << "[" << item.functionId << ":" << item.functionName << "] ["  
-    << item.basicBlockId <<":"<< item.basicBlockName << "] [" 
-    << item.basicBlockCount << "]\n";
+    if (workingFunctionName != item.functionName) {
+      if (workingFunctionName != ""){
+        out << "\n";
+      }
+      workingFunctionName = item.functionName;
+      out << "[" << item.functionId << ":" << item.functionName << "]";
+    }
+    out << " [" << item.basicBlockId << ":" << item.basicBlockName << ":" << item.basicBlockCount << "] ";
   }
 
   out.close();
