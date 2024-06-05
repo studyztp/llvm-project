@@ -169,6 +169,9 @@ void PhaseAnalysisPass::modifyROIFunctions(Module &M) {
   if (!roiBegin) {
     errs() << "Function roi_begin_ not found\n";
   }
+  for (auto attri: roiBegin->getAttributes()) {
+    errs() << "Attribute: " << attri.getAsString() << "\n";
+  }
   Function* roiEnd = M.getFunction("roi_end_");
   if (!roiEnd) {
     errs() << "Function roi_end_ not found\n";
