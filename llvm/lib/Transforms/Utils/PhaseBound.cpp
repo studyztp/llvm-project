@@ -82,7 +82,7 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
     {
       continue;
     }
-    if (std::find(exclude_functions.begin(), exclude_functions.end(), function.getName()) != exclude_functions.end()) {
+    if (function.hasFnAttribute(Attribute::NoProfile)) {
       errs() << "Skipping function: " << function.getName() << "\n";
       continue;
     }

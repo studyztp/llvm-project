@@ -58,31 +58,6 @@ public:
   bool emptyFunction(Function &F);
   Function* createMarkerFunction(Module& M, std::string functionName,
                                 uint64_t threshold, std::string raiseFunction);
-  // temp excluding list
-  std::vector<std::string> exclude_functions = {
-    "print_array",
-    "print_int",
-    "print_hi",
-    "if_reach_threshold",
-    "reset_counter",
-    "increase_counter",
-    "increment_array_element_at",
-    "reset_array_element_at",
-    "increase_array_by",
-    "reset_array",
-    "instrumentationFunction",
-    "write_single_data",
-    "write_array_data",
-    "roi_begin_",
-    "roi_end_",
-    "start_marker",
-    "end_marker",
-    "start_function",
-    "end_function",
-    "warmup_marker",
-    "warmup_function",
-    "set_array_element_at",
-  };
 
 public:
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
