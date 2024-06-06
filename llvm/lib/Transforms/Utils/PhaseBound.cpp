@@ -98,16 +98,16 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
         std::istringstream current_line(line);
         std::getline(current_line, token, start);
         std::getline(current_line, token, middle);
+        errs() << "Function ID: " << token << "\n";
         uint32_t function_ref = std::stoi(token);
         std::getline(current_line, token, end);
+        errs() << "Function Name: " << token << "\n";
         std::string function_name = token;
         Function* function = M.getFunction(function_name);
         if (!function) {
             errs() << "Could not find function: " << function_name << "\n";
             continue;
         }
-        errs() << "Function: " << function_name << "\n";
-        errs() << "Function ID: " << function_ref << "\n";
         for (auto& block: *function) {
             if(!std::getline(current_line, token, start)) {
                 break;
