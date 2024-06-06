@@ -100,6 +100,9 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
         uint32_t functionId = std::stoi(match[1]);
         std::string functionName = match[2];
 
+        errs() << "Function ID: " << functionId << "\n"; 
+        errs() << "Function Name: " << functionName << "\n";
+
         Function* function = M.getFunction(functionName);
         if (!function) {
             errs() << "Could not find function: " << functionName << "\n";
@@ -112,6 +115,10 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
 
         for (auto& block: *function) {
             std::regex_search(searchStart, line.cend(), matchBasicBlock, eBasicBlock);
+            errs() << "Basic Block ID: " << matchBasicBlock[1] << "\n";
+            errs() << "Basic Block Name: " << matchBasicBlock[2] << "\n";
+            errs() << "Basic Block Count: " << matchBasicBlock[3] << "\n";
+            
             uint32_t basicBlockId = std::stoi(matchBasicBlock[1]);
             if (block.getName().str() != matchBasicBlock[2]) {
                 errs() << "Could not find basic block: " << matchBasicBlock[2] << "\n";
