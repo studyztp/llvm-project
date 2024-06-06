@@ -95,68 +95,69 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
     std::smatch matchBasicBlock;
     std::regex eBasicBlock("\\[(\\d+):(.*?):(\\d+)\\]");
 
-    while (std::regex_search(line, match, e)) {
-        basicBlockInfo basicBlock;
-        uint32_t functionId = std::stoi(match[1]);
-        std::string functionName = match[2];
 
-        errs() << "Function ID: " << functionId << "\n"; 
-        errs() << "Function Name: " << functionName << "\n";
+    while (std::getline(readThisFile, line)) {
+        if (std::regex_search(line, match, e)) {
+            basicBlockInfo basicBlock;
+            uint32_t functionId = std::stoi(match[1]);
+            std::string functionName = match[2];
 
-        Function* function = M.getFunction(functionName);
-        if (!function) {
-            errs() << "Could not find function: " << functionName << "\n";
-            continue;
-        }
+            errs() << "Function ID: " << functionId << "\n"; 
+            errs() << "Function Name: " << functionName << "\n";
 
-        basicBlock.functionId = functionId;
-        basicBlock.functionName = functionName;
-        basicBlock.function = function;
-
-        for (auto& block: *function) {
-            std::regex_search(searchStart, line.cend(), matchBasicBlock, eBasicBlock);
-            errs() << "Basic Block ID: " << matchBasicBlock[1] << "\n";
-            errs() << "Basic Block Name: " << matchBasicBlock[2] << "\n";
-            errs() << "Basic Block Count: " << matchBasicBlock[3] << "\n";
-
-            uint32_t basicBlockId = std::stoi(matchBasicBlock[1]);
-            if (block.getName().str() != matchBasicBlock[2]) {
-                errs() << "Could not find basic block: " << matchBasicBlock[2] << "\n";
+            Function* function = M.getFunction(functionName);
+            if (!function) {
+                errs() << "Could not find function: " << functionName << "\n";
                 continue;
-            } else {
-                basicBlock.basicBlockId = basicBlockId;
-                basicBlock.basicBlockName = matchBasicBlock[2];
-            }
-            uint64_t basicBlockCount = std::stoi(matchBasicBlock[3]);
-            if (block.size() != basicBlockCount) {
-                errs() << "Basic block count mismatch: " << basicBlockCount << " " << block.size() << "\n";
-                continue;
-            } else {
-                basicBlock.basicBlockCount = basicBlockCount;
-            }
-            basicBlock.basicBlock = &block;
-
-            if (basicBlock.functionId == startMarkerFunctionId && basicBlock.basicBlockId == startMarkerBBId) {
-                basicBlock.ifStartMark = true;
-            } else {
-                basicBlock.ifStartMark = false;
-            }
-            if (basicBlock.functionId == endMarkerFunctionId && basicBlock.basicBlockId == endMarkerBBId) {
-                basicBlock.ifEndMark = true;
-            } else {
-                basicBlock.ifEndMark = false;
-            }
-            if (basicBlock.functionId == warmupMarkerFunctionId && basicBlock.basicBlockId == warmupMarkerBBId) {
-                basicBlock.ifWarmupMark = true;
-            } else {
-                basicBlock.ifWarmupMark = false;
             }
 
-            basicBlockList.push_back(basicBlock);
-            
+            basicBlock.functionId = functionId;
+            basicBlock.functionName = functionName;
+            basicBlock.function = function;
+
+            for (auto& block: *function) {
+                std::regex_search(searchStart, line.cend(), matchBasicBlock, eBasicBlock);
+                errs() << "Basic Block ID: " << matchBasicBlock[1] << "\n";
+                errs() << "Basic Block Name: " << matchBasicBlock[2] << "\n";
+                errs() << "Basic Block Count: " << matchBasicBlock[3] << "\n";
+
+                uint32_t basicBlockId = std::stoi(matchBasicBlock[1]);
+                if (block.getName().str() != matchBasicBlock[2]) {
+                    errs() << "Could not find basic block: " << matchBasicBlock[2] << "\n";
+                    continue;
+                } else {
+                    basicBlock.basicBlockId = basicBlockId;
+                    basicBlock.basicBlockName = matchBasicBlock[2];
+                }
+                uint64_t basicBlockCount = std::stoi(matchBasicBlock[3]);
+                if (block.size() != basicBlockCount) {
+                    errs() << "Basic block count mismatch: " << basicBlockCount << " " << block.size() << "\n";
+                    continue;
+                } else {
+                    basicBlock.basicBlockCount = basicBlockCount;
+                }
+                basicBlock.basicBlock = &block;
+
+                if (basicBlock.functionId == startMarkerFunctionId && basicBlock.basicBlockId == startMarkerBBId) {
+                    basicBlock.ifStartMark = true;
+                } else {
+                    basicBlock.ifStartMark = false;
+                }
+                if (basicBlock.functionId == endMarkerFunctionId && basicBlock.basicBlockId == endMarkerBBId) {
+                    basicBlock.ifEndMark = true;
+                } else {
+                    basicBlock.ifEndMark = false;
+                }
+                if (basicBlock.functionId == warmupMarkerFunctionId && basicBlock.basicBlockId == warmupMarkerBBId) {
+                    basicBlock.ifWarmupMark = true;
+                } else {
+                    basicBlock.ifWarmupMark = false;
+                }
+
+                basicBlockList.push_back(basicBlock);
+                
+            }
         }
-
-
     }
 
     readThisFile.close(); 
