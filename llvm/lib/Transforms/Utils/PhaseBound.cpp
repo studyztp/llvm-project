@@ -106,16 +106,21 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
             errs() << "Could not find function: " << function_name << "\n";
             continue;
         }
+        errs() << "Function: " << function_name << "\n";
+        errs() << "Function ID: " << function_ref << "\n";
         for (auto& block: *function) {
             if(!std::getline(current_line, token, start)) {
                 break;
             }
             basicBlockInfo basicBlock;
             std::getline(current_line, token, middle);
+            errs() << "Basic Block ID: " << token << "\n";
             basicBlock.basicBlockId = std::stoi(token);
             std::getline(current_line, token, middle);
+            errs() << "Basic Block Name: " << token << "\n";
             basicBlock.basicBlockName = token;
             std::getline(current_line, token, end);
+            errs() << "Basic Block Count: " << token << "\n";
             basicBlock.basicBlockCount = std::stoull(token);
             basicBlock.functionName = function_name;
             basicBlock.functionId = function_ref;
@@ -135,7 +140,7 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
                 basicBlock.basicBlockId == warmupMarkerBBId);
         }
     }
-    
+
     readThisFile.close(); 
 }
 
