@@ -89,7 +89,7 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
 
     std::string line;
     
-    std::regex e("\\[(\\d+):(.*?)\\]( \\[(\\d+):(.*?):(\\d+)\\])*");
+    std::regex e("\\[(\\d+):(.*?)\\]");
     std::smatch match;
     std::string::const_iterator searchStart(line.cbegin());
     std::smatch matchBasicBlock;
@@ -118,7 +118,7 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
             errs() << "Basic Block ID: " << matchBasicBlock[1] << "\n";
             errs() << "Basic Block Name: " << matchBasicBlock[2] << "\n";
             errs() << "Basic Block Count: " << matchBasicBlock[3] << "\n";
-            
+
             uint32_t basicBlockId = std::stoi(matchBasicBlock[1]);
             if (block.getName().str() != matchBasicBlock[2]) {
                 errs() << "Could not find basic block: " << matchBasicBlock[2] << "\n";
