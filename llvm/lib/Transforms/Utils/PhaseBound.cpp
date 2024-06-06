@@ -145,6 +145,8 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
             basicBlock.ifWarmupMark = (
                 basicBlock.functionId == warmupMarkerFunctionId && 
                 basicBlock.basicBlockId == warmupMarkerBBId);
+
+            basicBlockList.push_back(basicBlock);
         }
     }
 
