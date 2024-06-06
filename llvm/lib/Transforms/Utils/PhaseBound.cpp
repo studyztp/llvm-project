@@ -110,7 +110,7 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
         basicBlock.functionName = functionName;
         basicBlock.function = function;
 
-        for (auto& block: function->getBasicBlockList()) {
+        for (auto& block: *function) {
             std::regex_search(searchStart, line.cend(), matchBasicBlock, eBasicBlock);
             uint32_t basicBlockId = std::stoi(matchBasicBlock[1]);
             if (block.getName().str() != matchBasicBlock[2]) {
