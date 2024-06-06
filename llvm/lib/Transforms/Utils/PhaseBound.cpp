@@ -117,19 +117,19 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
 
             for (auto& block: *function) {
                 std::regex_search(searchStart, line.cend(), matchBasicBlock, eBasicBlock);
-                errs() << "Basic Block ID: " << matchBasicBlock[1] << "\n";
-                errs() << "Basic Block Name: " << matchBasicBlock[2] << "\n";
-                errs() << "Basic Block Count: " << matchBasicBlock[3] << "\n";
+                errs() << "Basic Block ID: " << matchBasicBlock[0] << "\n";
+                errs() << "Basic Block Name: " << matchBasicBlock[1] << "\n";
+                errs() << "Basic Block Count: " << matchBasicBlock[2] << "\n";
 
-                uint32_t basicBlockId = std::stoi(matchBasicBlock[1]);
-                if (block.getName().str() != matchBasicBlock[2]) {
-                    errs() << "Could not find basic block: " << matchBasicBlock[2] << "\n";
+                uint32_t basicBlockId = std::stoi(matchBasicBlock[0]);
+                if (block.getName().str() != matchBasicBlock[1]) {
+                    errs() << "Could not find basic block: " << matchBasicBlock[1] << "\n";
                     continue;
                 } else {
                     basicBlock.basicBlockId = basicBlockId;
-                    basicBlock.basicBlockName = matchBasicBlock[2];
+                    basicBlock.basicBlockName = matchBasicBlock[1];
                 }
-                uint64_t basicBlockCount = std::stoi(matchBasicBlock[3]);
+                uint64_t basicBlockCount = std::stoi(matchBasicBlock[2]);
                 if (block.size() != basicBlockCount) {
                     errs() << "Basic block count mismatch: " << basicBlockCount << " " << block.size() << "\n";
                     continue;
@@ -155,6 +155,7 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
                 }
 
                 basicBlockList.push_back(basicBlock);
+                searchStart = matchBasicBlock.suffix().first;
                 
             }
         }
