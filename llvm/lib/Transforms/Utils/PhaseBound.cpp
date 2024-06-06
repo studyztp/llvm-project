@@ -88,79 +88,54 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
     }
 
     std::string line;
-    
-    std::regex e("\\[(\\d+):(.*?)\\]");
-    std::smatch match;
-    std::string::const_iterator searchStart(line.cbegin());
-    std::smatch matchBasicBlock;
-    std::regex eBasicBlock("\\[(\\d+):(.*?):(\\d+)\\]");
+    std::string token;
 
+    char start = '[';
+    char middle = ':';
+    char end = ']';
 
-    while (std::getline(readThisFile, line)) {
-        if (std::regex_search(line, match, e)) {
+    while(std::getline(readThisFile, line)) {
+        std::istringstream current_line(line);
+        std::getline(current_line, token, start);
+        std::getline(current_line, token, middle);
+        uint32_t function_ref = std::stoi(token);
+        std::getline(current_line, token, end);
+        std::string function_name = token;
+        Function* function = M.getFunction(function_name);
+        if (!function) {
+            errs() << "Could not find function: " << function_name << "\n";
+            continue;
+        }
+        for (auto& block: *function) {
+            if(!std::getline(current_line, token, start)) {
+                break;
+            }
             basicBlockInfo basicBlock;
-            uint32_t functionId = std::stoi(match[1]);
-            std::string functionName = match[2];
+            std::getline(current_line, token, middle);
+            basicBlock.basicBlockId = std::stoi(token);
+            std::getline(current_line, token, middle);
+            basicBlock.basicBlockName = token;
+            std::getline(current_line, token, end);
+            basicBlock.basicBlockCount = std::stoull(token);
+            basicBlock.functionName = function_name;
+            basicBlock.functionId = function_ref;
+            basicBlock.basicBlock = &block;
+            basicBlock.function = &(*function);
 
-            errs() << "Function ID: " << functionId << "\n"; 
-            errs() << "Function Name: " << functionName << "\n";
+            basicBlock.ifStartMark = (
+                basicBlock.functionId == startMarkerFunctionId && 
+                basicBlock.basicBlockId == startMarkerBBId);
+            
+            basicBlock.ifEndMark = (
+                basicBlock.functionId == endMarkerFunctionId && 
+                basicBlock.basicBlockId == endMarkerBBId);
 
-            Function* function = M.getFunction(functionName);
-            if (!function) {
-                errs() << "Could not find function: " << functionName << "\n";
-                continue;
-            }
-
-            basicBlock.functionId = functionId;
-            basicBlock.functionName = functionName;
-            basicBlock.function = function;
-
-            for (auto& block: *function) {
-                std::regex_search(searchStart, line.cend(), matchBasicBlock, eBasicBlock);
-                errs() << "Basic Block ID: " << matchBasicBlock[0] << "\n";
-                errs() << "Basic Block Name: " << matchBasicBlock[1] << "\n";
-                errs() << "Basic Block Count: " << matchBasicBlock[2] << "\n";
-
-                uint32_t basicBlockId = std::stoi(matchBasicBlock[0]);
-                if (block.getName().str() != matchBasicBlock[1]) {
-                    errs() << "Could not find basic block: " << matchBasicBlock[1] << "\n";
-                    continue;
-                } else {
-                    basicBlock.basicBlockId = basicBlockId;
-                    basicBlock.basicBlockName = matchBasicBlock[1];
-                }
-                uint64_t basicBlockCount = std::stoi(matchBasicBlock[2]);
-                if (block.size() != basicBlockCount) {
-                    errs() << "Basic block count mismatch: " << basicBlockCount << " " << block.size() << "\n";
-                    continue;
-                } else {
-                    basicBlock.basicBlockCount = basicBlockCount;
-                }
-                basicBlock.basicBlock = &block;
-
-                if (basicBlock.functionId == startMarkerFunctionId && basicBlock.basicBlockId == startMarkerBBId) {
-                    basicBlock.ifStartMark = true;
-                } else {
-                    basicBlock.ifStartMark = false;
-                }
-                if (basicBlock.functionId == endMarkerFunctionId && basicBlock.basicBlockId == endMarkerBBId) {
-                    basicBlock.ifEndMark = true;
-                } else {
-                    basicBlock.ifEndMark = false;
-                }
-                if (basicBlock.functionId == warmupMarkerFunctionId && basicBlock.basicBlockId == warmupMarkerBBId) {
-                    basicBlock.ifWarmupMark = true;
-                } else {
-                    basicBlock.ifWarmupMark = false;
-                }
-
-                basicBlockList.push_back(basicBlock);
-                searchStart = matchBasicBlock.suffix().first;
-                
-            }
+            basicBlock.ifWarmupMark = (
+                basicBlock.functionId == warmupMarkerFunctionId && 
+                basicBlock.basicBlockId == warmupMarkerBBId);
         }
     }
-
+    
     readThisFile.close(); 
 }
 
