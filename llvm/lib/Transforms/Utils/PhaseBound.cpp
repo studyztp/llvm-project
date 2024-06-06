@@ -147,6 +147,20 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
                 basicBlock.basicBlockId == warmupMarkerBBId);
 
             basicBlockList.push_back(basicBlock);
+
+            // extra check
+            if (basicBlock.basicBlockName != block.getName()) {
+                errs() << "For basic block: " << basicBlock.basicBlockId
+                    << "Basic block name mismatch: " << 
+                    basicBlock.basicBlockName << " " 
+                    << block.getName().str() << "\n";
+            }
+            if (basicBlock.basicBlockCount != block.size()) {
+                errs() << "For basic block: " << basicBlock.basicBlockId
+                    << "Basic block count mismatch: " << 
+                    basicBlock.basicBlockCount << " " 
+                    << block.size() << "\n";
+            }
         }
     }
 
