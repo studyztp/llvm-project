@@ -94,6 +94,13 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
     char middle = ':';
     char end = ']';
 
+    if(std::getline(readThisFile, line)) {
+        errs() << "reading basic block order file\n";
+    } else {
+        errs() << "Could not read line\n";
+        return;
+    }
+
     while(std::getline(readThisFile, line)) {
         std::istringstream current_line(line);
         std::getline(current_line, token, start);
