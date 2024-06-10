@@ -105,10 +105,10 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
         std::istringstream current_line(line);
         std::getline(current_line, token, start);
         std::getline(current_line, token, middle);
-        errs() << "Function ID: " << token << "\n";
+        // errs() << "Function ID: " << token << "\n";
         uint32_t function_ref = std::stoi(token);
         std::getline(current_line, token, end);
-        errs() << "Function Name: " << token << "\n";
+        // errs() << "Function Name: " << token << "\n";
         std::string function_name = token;
         Function* function = M.getFunction(function_name);
         if (!function) {
@@ -121,13 +121,13 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
             }
             basicBlockInfo basicBlock;
             std::getline(current_line, token, middle);
-            errs() << "Basic Block ID: " << token << "\n";
+            // errs() << "Basic Block ID: " << token << "\n";
             basicBlock.basicBlockId = std::stoi(token);
             std::getline(current_line, token, middle);
-            errs() << "Basic Block Name: " << token << "\n";
+            // errs() << "Basic Block Name: " << token << "\n";
             basicBlock.basicBlockName = token;
             std::getline(current_line, token, end);
-            errs() << "Basic Block Count: " << token << "\n";
+            // errs() << "Basic Block Count: " << token << "\n";
             basicBlock.basicBlockCount = std::stoull(token);
             basicBlock.functionName = function_name;
             basicBlock.functionId = function_ref;
