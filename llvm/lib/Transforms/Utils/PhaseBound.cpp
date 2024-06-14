@@ -61,8 +61,26 @@ void PhaseBoundPass::getInformation(Module &M) {
 
     readThisFile.close();
 
-    if (warmupMarkerFunctionId == 0 && warmupMarkerBBId == 0 && warmupMarkerCount == 0) {
-        errs() << "No start marker found\n";
+    if (warmupMarkerFunctionId == 0 
+            && warmupMarkerBBId == 0 
+            && warmupMarkerCount == 0) {
+        hasWarmupMarker = false;
+        errs() << "No warmup marker found so warmup marker at roi begin\n";
+        Function* roiBegin = M.getFunction("roi_begin_");
+        if (!roiBegin) {
+            errs() << "Function roi_begin_ not found\n";
+        }
+        Function* warmupFunction = createMarkerFunction(M, \
+                        "warmup_function", warmupMarkerCount, "warmup_marker");
+        IRBuilder<> builder(M.getContext());
+        if (roiBegin->back().getTerminator()) {
+            builder.SetInsertPoint(roiBegin->back().getTerminator());
+        } else {
+            errs() << "Could not find terminator point for roiBegin\n";
+            builder.SetInsertPoint(roiBegin->back().getFirstInsertionPt());
+        }
+        builder.CreateCall(warmupFunction);
+
     } else {
         errs() << "warmupMarkerFunctionId: " << warmupMarkerFunctionId << "\n";
         errs() << "warmupMarkerBBId: " << warmupMarkerBBId << "\n";
@@ -143,6 +161,7 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
                 basicBlock.basicBlockId == endMarkerBBId);
 
             basicBlock.ifWarmupMark = (
+                hasWarmupMarker && 
                 basicBlock.functionId == warmupMarkerFunctionId && 
                 basicBlock.basicBlockId == warmupMarkerBBId);
 
