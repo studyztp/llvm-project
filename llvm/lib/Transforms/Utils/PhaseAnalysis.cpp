@@ -224,6 +224,22 @@ void PhaseAnalysisPass::modifyROIFunctionsForBBV(Module &M) {
 
 }
 
+void PhaseAnalysisPass::modifyROIFunctionsForPapi(Module &M) {
+  Function* roiBegin = M.getFunction("roi_begin_");
+  if (!roiBegin) {
+    errs() << "Function roi_begin_ not found\n";
+  }
+
+  IRBuilder<> builder(M.getContext());
+
+  builder.SetInsertPoint(roiBegin->back().getTerminator());
+  // reset all global instruction counter and basic block distance counter
+  builder.CreateStore(
+    ConstantInt::get(Type::getInt64Ty(M.getContext()), 0), 
+    M.getGlobalVariable("instructionCounter"));
+
+}
+
 Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
   Type* VoidTy = Type::getVoidTy(M.getContext());
   Type* Int64Ty = Type::getInt64Ty(M.getContext());
@@ -334,6 +350,8 @@ void PhaseAnalysisPass::instrumentPapiAnalysis(Module &M) {
     });
   }
 
+  modifyROIFunctionsForPapi(M);
+
 }
 
 cl::opt<std::string> PhaseAnalysisOutputFilename(
@@ -365,7 +383,9 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
     errs() << "Could not open file: " << EC.message() << "\n";
   }
   threshold = PhaseAnalysisRegionLength;
+  errs() << "Threshold: " << threshold << "\n";
   usingPapiToAnalyze = PhaseAnalysisUsingPapi;
+
   IRBuilder<> builder(M.getContext());
 
   // Create a global variable to store the instruction count
