@@ -40,6 +40,7 @@ private:
   uint64_t totalFunctionCount;
   uint64_t totalBasicBlockCount;
   uint64_t threshold = 100000000;
+  bool usingPapiToAnalyze = false;
 
   std::vector<basicBlockInfo> basicBlockList;
 
@@ -53,10 +54,14 @@ private:
     uint64_t size
   );
 
-  void modifyROIFunctions(Module &M);
+  void modifyROIFunctionsForBBV(Module &M);
 
-  Function* createInstrumentationFunction(Module &M);
-  
+  Function* createBBVAnalysisFunction(Module &M);
+  Function* createPapiAnalysisFunction(Module &M);
+
+  void instrumentBBVAnalysis(Module &M);
+  void instrumentPapiAnalysis(Module &M);
+   
 public:
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
 };
