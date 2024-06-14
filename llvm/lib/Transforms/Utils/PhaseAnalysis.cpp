@@ -281,27 +281,6 @@ Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
   builder.SetInsertPoint(ifNotMeet);
   builder.CreateRetVoid();
 
-  std::vector<CallInst*> calls;
-
-  for (auto& BB : *F) {
-    for (auto& I : BB) {
-      if (isa<CallInst>(&I)) {
-        std::string name = cast<CallInst>(&I)->getCalledFunction()->getName().str();
-        if (name != "write_single_data" && name != "write_array_data") {
-          calls.push_back(cast<CallInst>(&I));
-        }
-      }
-    }
-  }
-
-  for (auto* call : calls) {
-    if(InlineFunction(*call, ifi).isSuccess()) {
-      errs() << "Successfully inlined function for" << call->getCalledFunction()->getName().str() << "\n";
-    } else {
-      errs() << "Failed to inline function for" << call->getCalledFunction()->getName().str() << "\n";
-    }
-  }
-
   return F;
 }
 
