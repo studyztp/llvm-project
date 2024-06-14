@@ -231,6 +231,13 @@ cl::opt<std::string> PhaseAnalysisOutputFilename(
   cl::ValueRequired
 );
 
+cl::opt<uint64_t> PhaseAnalysisRegionLength(
+  "phase-analysis-region-length",
+  cl::init(100000000),
+  cl::desc("<region length>"),
+  cl::ValueRequired
+);
+
 PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM) 
 {
   std::error_code EC;
@@ -238,6 +245,7 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
   if (EC) {
     errs() << "Could not open file: " << EC.message() << "\n";
   }
+  threshold = PhaseAnalysisRegionLength;
   IRBuilder<> builder(M.getContext());
 
   // Create a global variable to store the instruction count
