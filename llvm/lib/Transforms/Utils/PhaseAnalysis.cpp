@@ -106,12 +106,9 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
   CallInst* incrementBasicBlockVector = 
   builder.CreateCall(incrementArrayElementAtFunction, {basicBlockVector, basicBlockId});
 
-  // can be atomic load
-  Value* loadNewCounter = builder.CreateLoad(Int64Ty, counter);
-
   // can be atomic comparison
   Value* ifReachThreshold = 
-      builder.CreateICmpSGE(loadNewCounter, ConstantInt::get(Int64Ty, threshold));
+      builder.CreateICmpSGE(addResult, ConstantInt::get(Int64Ty, threshold));
   builder.CreateCondBr(ifReachThreshold, ifMeet, ifNotMeet);
 
   builder.SetInsertPoint(ifMeet);
@@ -119,7 +116,7 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
   // whole function with mutex calling from the profiler_helper.c
   // print the global counter
   builder.CreateCall(writeSingleDataFunction,
-  {builder.CreateGlobalStringPtr("instructionCounter"), loadNewCounter});
+  {builder.CreateGlobalStringPtr("instructionCounter"), addResult});
   // print the basic block vector
   builder.CreateCall(writeArrayDataFunction,
   {builder.CreateGlobalStringPtr("basic block vector"),
