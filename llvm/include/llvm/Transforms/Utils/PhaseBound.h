@@ -53,6 +53,7 @@ public:
   uint64_t warmupMarkerFunctionId;
   uint64_t warmupMarkerBBId;
   uint64_t warmupMarkerCount;
+  bool hasWarmupMarker = true;
 
   void getInformation(Module &M);
   void formBasicBlockList(Module& M);
