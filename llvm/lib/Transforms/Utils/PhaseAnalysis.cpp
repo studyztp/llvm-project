@@ -90,7 +90,19 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
     errs() << "Function reset_array not found\n";
   }
 
+  Function* getLockFunction = M.getFunction("get_lock");
+  if (!getLockFunction) {
+    errs() << "Function get_lock not found\n";
+  }
+
+  Function* releaseLockFunction = M.getFunction("release_lock");
+  if (!releaseLockFunction) {
+    errs() << "Function release_lock not found\n";
+  }
+
   InlineFunctionInfo ifi;
+
+  builder.CreateCall(getLockFunction);
 
   // can be atomic add
   // increase global counter by bb IR inst count
@@ -134,9 +146,11 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
   builder.CreateCall(resetArrayFunction, 
   {basicBlockDist, 
   ConstantInt::get(Int32Ty, totalBasicBlockCount)});
+  builder.CreateCall(releaseLockFunction);  
   builder.CreateRetVoid(); 
 
   builder.SetInsertPoint(ifNotMeet);
+  builder.CreateCall(releaseLockFunction);
   builder.CreateRetVoid();
 
   std::vector<CallInst*> calls;
@@ -145,7 +159,8 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
     for (auto& I : BB) {
       if (isa<CallInst>(&I)) {
         std::string name = cast<CallInst>(&I)->getCalledFunction()->getName().str();
-        if (name != "write_single_data" && name != "write_array_data") {
+        if (name != "write_single_data" && name != "write_array_data"
+                  && name != "get_lock" && name != "release_lock") {
           calls.push_back(cast<CallInst>(&I));
         }
       }
@@ -268,6 +283,16 @@ Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
     errs() << "Function end_region not found\n";
   }
 
+  Function* getLockFunction = M.getFunction("get_lock");
+  if (!getLockFunction) {
+    errs() << "Function get_lock not found\n";
+  }
+
+  Function* releaseLockFunction = M.getFunction("release_lock");
+  if (!releaseLockFunction) {
+    errs() << "Function release_lock not found\n";
+  }
+
   Value* counter = M.getGlobalVariable("instructionCounter");
   if (!counter) {
     errs() << "Global variable instructionCounter not found\n";
@@ -276,6 +301,8 @@ Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
   InlineFunctionInfo ifi;
 
   builder.SetInsertPoint(mainBB);
+
+  builder.CreateCall(getLockFunction);
 
   Value* loadOldCounter = builder.CreateLoad(Int64Ty, counter);
   Value* addResult = builder.CreateAdd(loadOldCounter, basicBlockInstCount);
@@ -289,9 +316,12 @@ Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
   builder.CreateCall(papiRegionEnd);
   builder.CreateCall(papiRegionBegin);
   builder.CreateStore(ConstantInt::get(Int64Ty, 0), counter);
+
+  builder.CreateCall(releaseLockFunction);
   builder.CreateRetVoid(); 
 
   builder.SetInsertPoint(ifNotMeet);
+  builder.CreateCall(releaseLockFunction);
   builder.CreateRetVoid();
 
   return F;
