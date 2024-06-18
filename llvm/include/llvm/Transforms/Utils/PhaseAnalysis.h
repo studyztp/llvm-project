@@ -59,9 +59,6 @@ private:
 
   Function* createBBVAnalysisFunction(Module &M);
   Function* createPapiAnalysisFunction(Module &M);
-  Function* createBBVParallelAnalysisFunction(Module &M);
-  Function* createPapiParallelAnalysisFunction(Module &M);
-
 
   void instrumentBBVAnalysis(Module &M);
   void instrumentPapiAnalysis(Module &M);
