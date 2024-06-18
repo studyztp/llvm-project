@@ -71,7 +71,7 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
 
   InlineFunctionInfo ifi;
 
-  Value* returnValue = builder.CreateCall(checkUpFunction, 
+  CallInst* returnValue = builder.CreateCall(checkUpFunction, 
         {counter, basicBlockInstCount, ConstantInt::get(Int64Ty, threshold)});
   builder.CreateCondBr(returnValue, ifMeet, ifNotMeet);
 
