@@ -34,8 +34,7 @@ GlobalVariable* PhaseAnalysisPass::createGlobalUint64Array(
   return gvar_array;
 }
 
-
-Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
+Function* PhaseAnalysisPass::createBBVParallelAnalysisFunction(Module &M) {
   Type* VoidTy = Type::getVoidTy(M.getContext());
   Type* Int64Ty = Type::getInt64Ty(M.getContext());
   Type* Int32Ty = Type::getInt32Ty(M.getContext());
@@ -43,7 +42,7 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
   Function* F = Function::Create(
     FTy,
     GlobalValue::ExternalLinkage,
-    "instrumentationFunction",
+    "instrumentationFunction_parallel",
     M
   );
   F->addFnAttr(Attribute::NoInline);
@@ -178,6 +177,136 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
   return F;
 }
 
+
+Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
+  Type* VoidTy = Type::getVoidTy(M.getContext());
+  Type* Int64Ty = Type::getInt64Ty(M.getContext());
+  Type* Int32Ty = Type::getInt32Ty(M.getContext());
+  FunctionType* FTy = FunctionType::get(VoidTy, {Int32Ty, Int64Ty}, false);
+  Function* F = Function::Create(
+    FTy,
+    GlobalValue::ExternalLinkage,
+    "instrumentationFunction",
+    M
+  );
+  F->addFnAttr(Attribute::NoInline);
+  F->addFnAttr(Attribute::NoProfile);
+
+  BasicBlock* mainBB = BasicBlock::Create(M.getContext(), "instrumentation_entry", F);
+  BasicBlock* ifMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifMeet", F);
+  BasicBlock* ifNotMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifNotMeet", F);
+  IRBuilder<> builder(M.getContext());
+  builder.SetInsertPoint(mainBB);
+  Function::arg_iterator args = F->arg_begin();
+  Value* basicBlockId = &*args++;
+  Value* basicBlockInstCount = &*args++;
+
+  Value* counter = M.getGlobalVariable("instructionCounter");
+  if (!counter) {
+    errs() << "Global variable instructionCounter not found\n";
+  }
+
+  Value* basicBlockVector = M.getGlobalVariable("basicBlockVector");
+
+  Value* basicBlockDist = M.getGlobalVariable("basicBlockDist");
+
+  Function* writeSingleDataFunction = M.getFunction("write_single_data");
+  if (!writeSingleDataFunction) {
+    errs() << "Function write_single_data not found\n";
+  }
+  Function* writeArrayDataFunction = M.getFunction("write_array_data");
+  if (!writeArrayDataFunction) {
+    errs() << "Function write_array_data not found\n";
+  }
+
+  Function* incrementArrayElementAtFunction = M.getFunction("increment_array_element_at");
+  if (!incrementArrayElementAtFunction) {
+    errs() << "Function increment_array_element_at not found\n";
+  }
+  Function* setArrayElementAtFunction = M.getFunction("set_array_element_at");
+  if (!setArrayElementAtFunction) {
+    errs() << "Function set_array_element_at not found\n";
+  }
+
+  Function* resetArrayFunction = M.getFunction("reset_array");
+  if (!resetArrayFunction) {
+    errs() << "Function reset_array not found\n";
+  }
+
+  InlineFunctionInfo ifi;
+
+  // can be atomic add
+  // increase global counter by bb IR inst count
+  Value* loadOldCounter = builder.CreateLoad(Int64Ty, counter);
+  Value* addResult = builder.CreateAdd(loadOldCounter, basicBlockInstCount);
+  builder.CreateStore(addResult, counter);
+
+  // set the timestamp of the basic block to the global counter
+  CallInst* resetBasicBlockDistanceOfCurrentBlock = 
+  builder.CreateCall(setArrayElementAtFunction, {basicBlockDist, basicBlockId, addResult});
+
+  // increase basic block vector counter by 1
+  CallInst* incrementBasicBlockVector = 
+  builder.CreateCall(incrementArrayElementAtFunction, {basicBlockVector, basicBlockId});
+
+  // can be atomic comparison
+  Value* ifReachThreshold = 
+      builder.CreateICmpSGE(addResult, ConstantInt::get(Int64Ty, threshold));
+  builder.CreateCondBr(ifReachThreshold, ifMeet, ifNotMeet);
+
+  builder.SetInsertPoint(ifMeet);
+  // the helper function side should have mutex lock or we can wrap this 
+  // whole function with mutex calling from the profiler_helper.c
+  // print the global counter
+  builder.CreateCall(writeSingleDataFunction,
+  {builder.CreateGlobalStringPtr("instructionCounter"), addResult});
+  // print the basic block vector
+  builder.CreateCall(writeArrayDataFunction,
+  {builder.CreateGlobalStringPtr("basic block vector"),
+  basicBlockVector, ConstantInt::get(Int32Ty, totalBasicBlockCount)});
+  // print the basic block distance
+  builder.CreateCall(writeArrayDataFunction,
+  {builder.CreateGlobalStringPtr("basic block distance"),
+  basicBlockDist, ConstantInt::get(Int32Ty, totalBasicBlockCount)});
+
+  // can set to atomic store later
+  // reset the global counter
+  builder.CreateStore(ConstantInt::get(Int64Ty, 0), counter);
+  // reset the basic block distance
+  CallInst* resetBasicBlockDistance =
+  builder.CreateCall(resetArrayFunction, 
+  {basicBlockDist, 
+  ConstantInt::get(Int32Ty, totalBasicBlockCount)});
+  builder.CreateRetVoid(); 
+
+  builder.SetInsertPoint(ifNotMeet);
+  builder.CreateRetVoid();
+
+  std::vector<CallInst*> calls;
+
+  for (auto& BB : *F) {
+    for (auto& I : BB) {
+      if (isa<CallInst>(&I)) {
+        std::string name = cast<CallInst>(&I)->getCalledFunction()->getName().str();
+        if (name != "write_single_data" && name != "write_array_data"
+                  && name != "get_lock" && name != "release_lock") {
+          calls.push_back(cast<CallInst>(&I));
+        }
+      }
+    }
+  }
+
+  for (auto* call : calls) {
+    if(InlineFunction(*call, ifi).isSuccess()) {
+      errs() << "Successfully inlined function for" << call->getCalledFunction()->getName().str() << "\n";
+    } else {
+      errs() << "Failed to inline function for" << call->getCalledFunction()->getName().str() << "\n";
+    }
+  }
+
+  return F;
+}
+
 void PhaseAnalysisPass::modifyROIFunctionsForBBV(Module &M) {
   Function* roiBegin = M.getFunction("roi_begin_");
   if (!roiBegin) {
@@ -252,14 +381,14 @@ void PhaseAnalysisPass::modifyROIFunctionsForPapi(Module &M) {
 
 }
 
-Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
+Function* PhaseAnalysisPass::createPapiParallelAnalysisFunction(Module &M) {
   Type* VoidTy = Type::getVoidTy(M.getContext());
   Type* Int64Ty = Type::getInt64Ty(M.getContext());
   FunctionType* FTy = FunctionType::get(VoidTy, {Int64Ty}, false);
   Function* F = Function::Create(
     FTy,
     GlobalValue::ExternalLinkage,
-    "instrumentationFunction",
+    "instrumentationFunction_parallel",
     M
   );
   F->addFnAttr(Attribute::NoInline);
@@ -327,6 +456,67 @@ Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
   return F;
 }
 
+Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
+  Type* VoidTy = Type::getVoidTy(M.getContext());
+  Type* Int64Ty = Type::getInt64Ty(M.getContext());
+  FunctionType* FTy = FunctionType::get(VoidTy, {Int64Ty}, false);
+  Function* F = Function::Create(
+    FTy,
+    GlobalValue::ExternalLinkage,
+    "instrumentationFunction",
+    M
+  );
+  F->addFnAttr(Attribute::NoInline);
+  F->addFnAttr(Attribute::NoProfile);
+
+  BasicBlock* mainBB = BasicBlock::Create(M.getContext(), "instrumentation_entry", F);
+  BasicBlock* ifMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifMeet", F);
+  BasicBlock* ifNotMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifNotMeet", F);
+  IRBuilder<> builder(M.getContext());
+
+  Function::arg_iterator args = F->arg_begin();
+  Value* basicBlockInstCount = &*args;
+
+  Function* papiRegionBegin = M.getFunction("start_papi_region");
+  if (!papiRegionBegin) {
+    errs() << "Function start_region not found\n";
+  }
+
+  Function* papiRegionEnd = M.getFunction("end_papi_region");
+  if (!papiRegionEnd) {
+    errs() << "Function end_region not found\n";
+  }
+
+  Value* counter = M.getGlobalVariable("instructionCounter");
+  if (!counter) {
+    errs() << "Global variable instructionCounter not found\n";
+  }
+
+  InlineFunctionInfo ifi;
+
+  builder.SetInsertPoint(mainBB);
+
+  Value* loadOldCounter = builder.CreateLoad(Int64Ty, counter);
+  Value* addResult = builder.CreateAdd(loadOldCounter, basicBlockInstCount);
+  builder.CreateStore(addResult, counter);
+
+  Value* ifReachThreshold = 
+      builder.CreateICmpSGE(addResult, ConstantInt::get(Int64Ty, threshold));
+  builder.CreateCondBr(ifReachThreshold, ifMeet, ifNotMeet);
+
+  builder.SetInsertPoint(ifMeet);
+  builder.CreateCall(papiRegionEnd);
+  builder.CreateCall(papiRegionBegin);
+  builder.CreateStore(ConstantInt::get(Int64Ty, 0), counter);
+
+  builder.CreateRetVoid(); 
+
+  builder.SetInsertPoint(ifNotMeet);
+  builder.CreateRetVoid();
+
+  return F;
+}
+
 void PhaseAnalysisPass::instrumentBBVAnalysis(Module &M) {
   IRBuilder<> builder(M.getContext());
   // create arrays
@@ -341,6 +531,7 @@ void PhaseAnalysisPass::instrumentBBVAnalysis(Module &M) {
 
   // Create the instrumentation function
   Function* instrumentationFunction = createBBVAnalysisFunction(M);
+  Function* instrumentationFunctionParallel = createBBVParallelAnalysisFunction(M);
 
   for (auto item : basicBlockList) {
     if (item.basicBlock->getTerminator()) {
@@ -349,11 +540,20 @@ void PhaseAnalysisPass::instrumentBBVAnalysis(Module &M) {
       errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
       builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
     }
-    
-    CallInst* main_instrument = builder.CreateCall(instrumentationFunction, {
+    if (item.functionName.find("omp") != std::string::npos) {
+      // Code to be executed if "omp" is found in the function name
+          CallInst* main_instrument = builder.CreateCall(instrumentationFunctionParallel, {
       ConstantInt::get(Type::getInt32Ty(M.getContext()), item.basicBlockId),
       ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
     });
+
+    } else {
+      CallInst* main_instrument = builder.CreateCall(instrumentationFunction, {
+      ConstantInt::get(Type::getInt32Ty(M.getContext()), item.basicBlockId),
+      ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
+    });
+    }
+
   }
 
   modifyROIFunctionsForBBV(M);
@@ -363,6 +563,7 @@ void PhaseAnalysisPass::instrumentPapiAnalysis(Module &M) {
   IRBuilder<> builder(M.getContext());
 
   Function* instrumentationFunction = createPapiAnalysisFunction(M);
+  Function* instrumentationFunctionParallel = createPapiParallelAnalysisFunction(M);
 
   for (auto item : basicBlockList) {
     if (item.basicBlock->getTerminator()) {
@@ -371,10 +572,18 @@ void PhaseAnalysisPass::instrumentPapiAnalysis(Module &M) {
       errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
       builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
     }
-    
-    CallInst* main_instrument = builder.CreateCall(instrumentationFunction, {
-      ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
-    });
+    if (item.functionName.find("omp") != std::string::npos) {
+      // Code to be executed if "omp" is found in the function name
+        CallInst* main_instrument = builder.CreateCall(instrumentationFunctionParallel, {
+          ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
+      });
+    } else {
+        // Call the instrumentation function with the basic block count as the argument
+        // (this is the number of instructions in the basic block
+      CallInst* main_instrument = builder.CreateCall(instrumentationFunction, {
+        ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
+      });
+    }
   }
 
   modifyROIFunctionsForPapi(M);
