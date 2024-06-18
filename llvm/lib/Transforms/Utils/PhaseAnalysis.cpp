@@ -36,6 +36,7 @@ GlobalVariable* PhaseAnalysisPass::createGlobalUint64Array(
 
 Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
   Type* VoidTy = Type::getVoidTy(M.getContext());
+  Type* Int1Ty = Type::getInt1Ty(M.getContext());
   Type* Int64Ty = Type::getInt64Ty(M.getContext());
   Type* Int32Ty = Type::getInt32Ty(M.getContext());
   FunctionType* FTy = FunctionType::get(VoidTy, {Int32Ty, Int64Ty}, false);
@@ -73,8 +74,8 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
 
   CallInst* returnValue = builder.CreateCall(checkUpFunction, 
         {counter, basicBlockInstCount, ConstantInt::get(Int64Ty, threshold)});
-  Value* ifItIsOne = builder.CreateICmpEQ(returnValue, ConstantInt::get(Int32Ty, 1));
-  builder.CreateCondBr(ifItIsOne, ifMeet, ifNotMeet);
+  Value* castToInt1Ty = builder.CreateIntCast(returnValue, Int1Ty, false);
+  builder.CreateCondBr(castToInt1Ty, ifMeet, ifNotMeet);
 
   builder.SetInsertPoint(ifMeet);
   builder.CreateCall(printThreadIdFunction);
