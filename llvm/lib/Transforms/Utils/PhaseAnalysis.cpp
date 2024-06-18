@@ -73,7 +73,8 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
 
   CallInst* returnValue = builder.CreateCall(checkUpFunction, 
         {counter, basicBlockInstCount, ConstantInt::get(Int64Ty, threshold)});
-  builder.CreateCondBr(returnValue, ifMeet, ifNotMeet);
+  Value* ifItIsOne = builder.CreateICmpEQ(returnValue, ConstantInt::get(Int32Ty, 1));
+  builder.CreateCondBr(ifItIsOne, ifMeet, ifNotMeet);
 
   builder.SetInsertPoint(ifMeet);
   builder.CreateCall(printThreadIdFunction);
