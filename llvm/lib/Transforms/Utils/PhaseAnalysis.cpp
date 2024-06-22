@@ -72,7 +72,7 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
 
   builder.CreateCall(BBHookFunction, {
     basicBlockInstCount
-  })
+  });
 
   // CallInst* returnValue = builder.CreateCall(checkUpFunction, 
   //       {counter, basicBlockInstCount, ConstantInt::get(Int64Ty, threshold)});
