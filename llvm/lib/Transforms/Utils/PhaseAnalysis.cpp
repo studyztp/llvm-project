@@ -50,8 +50,8 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
   F->addFnAttr(Attribute::NoProfile);
 
   BasicBlock* mainBB = BasicBlock::Create(M.getContext(), "instrumentation_entry", F);
-  BasicBlock* ifMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifMeet", F);
-  BasicBlock* ifNotMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifNotMeet", F);
+  // BasicBlock* ifMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifMeet", F);
+  // BasicBlock* ifNotMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifNotMeet", F);
   IRBuilder<> builder(M.getContext());
   builder.SetInsertPoint(mainBB);
   Function::arg_iterator args = F->arg_begin();
@@ -63,25 +63,27 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
     errs() << "Global variable instructionCounter not found\n";
   }
 
-  Function* checkUpFunction = M.getFunction("atomic_increase");
-  if (!checkUpFunction) {
-    errs() << "Function atomic_increase not found\n";
+  Function* BBHookFunction = M.getFunction("bb_hook");
+  if (!BBHookFunction) {
+    errs() << "Function bb_hook not found\n";
   }
-
-  Function* printThreadIdFunction = M.getFunction("print_thread_num");
 
   InlineFunctionInfo ifi;
 
-  CallInst* returnValue = builder.CreateCall(checkUpFunction, 
-        {counter, basicBlockInstCount, ConstantInt::get(Int64Ty, threshold)});
-  Value* castToInt1Ty = builder.CreateIntCast(returnValue, Int1Ty, false);
-  builder.CreateCondBr(castToInt1Ty, ifMeet, ifNotMeet);
+  builder.CreateCall(BBHookFunction, {
+    basicBlockInstCount
+  })
 
-  builder.SetInsertPoint(ifMeet);
-  builder.CreateCall(printThreadIdFunction);
-  builder.CreateRetVoid(); 
+  // CallInst* returnValue = builder.CreateCall(checkUpFunction, 
+  //       {counter, basicBlockInstCount, ConstantInt::get(Int64Ty, threshold)});
+  // Value* castToInt1Ty = builder.CreateIntCast(returnValue, Int1Ty, false);
+  // builder.CreateCondBr(castToInt1Ty, ifMeet, ifNotMeet);
 
-  builder.SetInsertPoint(ifNotMeet);
+  // builder.SetInsertPoint(ifMeet);
+  // builder.CreateCall(printThreadIdFunction);
+  // builder.CreateRetVoid(); 
+
+  // builder.SetInsertPoint(ifNotMeet);
   builder.CreateRetVoid();
 
   std::vector<CallInst*> calls;
