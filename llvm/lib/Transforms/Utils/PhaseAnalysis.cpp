@@ -63,9 +63,16 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
     errs() << "Global variable instructionCounter not found\n";
   }
 
-  Function* BBHookFunction = M.getFunction("bb_hook");
+  std::string bbHookFunctionName = "";
+  for (auto& function : M.getFunctionList()) {
+    if (function.getName().str().find("bb_hook") != std::string::npos) {
+      bbHookFunctionName = function.getName().str();
+    }
+  }
+
+  Function* BBHookFunction = M.getFunction(bbHookFunctionName);
   if (!BBHookFunction) {
-    errs() << "Function bb_hook not found\n";
+    errs() << "Function " << bbHookFunctionName<< " not found\n";
   }
 
   InlineFunctionInfo ifi;
