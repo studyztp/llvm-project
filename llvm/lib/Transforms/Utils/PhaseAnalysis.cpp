@@ -281,7 +281,7 @@ void PhaseAnalysisPass::instrumentBBVAnalysis(Module &M) {
 
   }
 
-  modifyROIFunctionsForBBV(M);
+  // modifyROIFunctionsForBBV(M);
 }
 
 void PhaseAnalysisPass::instrumentPapiAnalysis(Module &M) {
