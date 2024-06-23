@@ -358,14 +358,23 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
   totalFunctionCount = 0;
   totalBasicBlockCount = 0;
 
+  const TargetLibraryInfo *TLI; 
+  LibFunc inbuilt_func;
+
   // find all basic blocks that will be instrumented
   for (auto& function : M.getFunctionList()) {
     if (emptyFunction(function) || function.isDeclaration()) 
     {
       continue;
     }
+    
     if (function.hasFnAttribute(Attribute::NoProfile)) {
       errs() << "Skipping function: " << function.getName() << "\n";
+      continue;
+    }
+
+    if (TLI->getLibFunc(function, inbuilt_func)) {
+      errs() << "Skipping inbuilt function: " << function.getName() << "\n";
       continue;
     }
 
