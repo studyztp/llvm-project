@@ -11,6 +11,7 @@
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include <bits/stdc++.h>
 #include <string>
 #include <vector>
 
