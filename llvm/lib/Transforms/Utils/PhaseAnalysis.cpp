@@ -363,11 +363,12 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
 
   // find all basic blocks that will be instrumented
   for (auto& function : M.getFunctionList()) {
+    std::string functionName = function.getName().str();
     if (emptyFunction(function) || function.isDeclaration()) 
     {
       continue;
     }
-    
+
     if (function.hasFnAttribute(Attribute::NoProfile)) {
       errs() << "Skipping function: " << function.getName() << "\n";
       continue;
@@ -375,6 +376,16 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
 
     if (TLI->getLibFunc(function, inbuilt_func)) {
       errs() << "Skipping inbuilt function: " << function.getName() << "\n";
+      continue;
+    }
+
+    if (functionName.find("_GLOBAL__sub_I_") != std::string::npos ||
+      functionName.find("__cxx_global_var_init") != std::string::npos ||
+      functionName.find("_ZNSt13__atomic_baseImEpLEm") != std::string::npos ||
+      functionName.find("_ZStanSt12memory_orderSt23__memory_order_modifier") != std::string::npos ||
+      functionName.find("__clang_call_terminate") != std::string::npos ||
+      functionName.find("_ZNSt13__atomic_baseImEaSEm") != std::string::npos) {
+      // This is an auto-generated function, skip it
       continue;
     }
 
