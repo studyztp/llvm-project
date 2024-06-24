@@ -358,8 +358,8 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
   totalFunctionCount = 0;
   totalBasicBlockCount = 0;
 
-  const TargetLibraryInfo *TLI; 
-  LibFunc inbuilt_func;
+  // const TargetLibraryInfo *TLI; 
+  // LibFunc inbuilt_func;
 
   // find all basic blocks that will be instrumented
   for (auto& function : M.getFunctionList()) {
@@ -374,10 +374,10 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
       continue;
     }
 
-    if (TLI->getLibFunc(function, inbuilt_func)) {
-      errs() << "Skipping inbuilt function: " << function.getName() << "\n";
-      continue;
-    }
+    // if (TLI->getLibFunc(function, inbuilt_func)) {
+    //   errs() << "Skipping inbuilt function: " << function.getName() << "\n";
+    //   continue;
+    // }
 
     if (functionName.find("_GLOBAL__sub_I_") != std::string::npos ||
       functionName.find("__cxx_global_var_init") != std::string::npos ||
