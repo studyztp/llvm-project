@@ -78,19 +78,10 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
   InlineFunctionInfo ifi;
 
   builder.CreateCall(BBHookFunction, {
-    basicBlockInstCount
+    basicBlockInstCount,
+    ConstantInt::get(Int64Ty, threshold)
   });
 
-  // CallInst* returnValue = builder.CreateCall(checkUpFunction, 
-  //       {counter, basicBlockInstCount, ConstantInt::get(Int64Ty, threshold)});
-  // Value* castToInt1Ty = builder.CreateIntCast(returnValue, Int1Ty, false);
-  // builder.CreateCondBr(castToInt1Ty, ifMeet, ifNotMeet);
-
-  // builder.SetInsertPoint(ifMeet);
-  // builder.CreateCall(printThreadIdFunction);
-  // builder.CreateRetVoid(); 
-
-  // builder.SetInsertPoint(ifNotMeet);
   builder.CreateRetVoid();
 
   std::vector<CallInst*> calls;
@@ -358,9 +349,6 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
   totalFunctionCount = 0;
   totalBasicBlockCount = 0;
 
-  // const TargetLibraryInfo *TLI; 
-  // LibFunc inbuilt_func;
-
   // find all basic blocks that will be instrumented
   for (auto& function : M.getFunctionList()) {
     std::string functionName = function.getName().str();
@@ -373,11 +361,6 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
       errs() << "Skipping function: " << function.getName() << "\n";
       continue;
     }
-
-    // if (TLI->getLibFunc(function, inbuilt_func)) {
-    //   errs() << "Skipping inbuilt function: " << function.getName() << "\n";
-    //   continue;
-    // }
 
     if (functionName.find("_GLOBAL__sub_I_") != std::string::npos ||
       functionName.find("__cxx_global_var_init") != std::string::npos ||
