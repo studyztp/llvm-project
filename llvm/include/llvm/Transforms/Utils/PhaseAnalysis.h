@@ -41,7 +41,7 @@ public:
 private:
   uint64_t totalFunctionCount;
   uint64_t totalBasicBlockCount;
-  uint64_t threshold = 100000000;
+  uint64_t threshold;
   bool usingPapiToAnalyze = false;
 
   std::vector<basicBlockInfo> basicBlockList;
