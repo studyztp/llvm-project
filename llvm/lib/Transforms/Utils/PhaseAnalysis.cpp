@@ -303,7 +303,9 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
       functionName.find("_ZNSt13__atomic_") != std::string::npos ||
       functionName.find("_ZStanSt12memory_orderSt23__memory_order_modifier") != std::string::npos ||
       functionName.find("__clang_call_terminate") != std::string::npos ||
-      functionName.find("_ZNSt13__atomic_baseImEaSEm") != std::string::npos) {
+      functionName.find("_ZNSt13__atomic_baseImEaSEm") != std::string::npos ||
+      functionName.find("cxx119to_string") != std::string::npos ||
+      functionName.find("cxx1112basic_string") != std::string::npos) {
       // This is an auto-generated function, skip it
       continue;
     }
