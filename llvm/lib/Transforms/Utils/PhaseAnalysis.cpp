@@ -36,10 +36,8 @@ GlobalVariable* PhaseAnalysisPass::createGlobalUint64Array(
 
 Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
   Type* VoidTy = Type::getVoidTy(M.getContext());
-  Type* Int1Ty = Type::getInt1Ty(M.getContext());
   Type* Int64Ty = Type::getInt64Ty(M.getContext());
-  Type* Int32Ty = Type::getInt32Ty(M.getContext());
-  FunctionType* FTy = FunctionType::get(VoidTy, {Int32Ty, Int64Ty}, false);
+  FunctionType* FTy = FunctionType::get(VoidTy, {Int64Ty, Int64Ty}, false);
   Function* F = Function::Create(
     FTy,
     GlobalValue::ExternalLinkage,
@@ -50,18 +48,11 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
   F->addFnAttr(Attribute::NoProfile);
 
   BasicBlock* mainBB = BasicBlock::Create(M.getContext(), "instrumentation_entry", F);
-  // BasicBlock* ifMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifMeet", F);
-  // BasicBlock* ifNotMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifNotMeet", F);
   IRBuilder<> builder(M.getContext());
   builder.SetInsertPoint(mainBB);
   Function::arg_iterator args = F->arg_begin();
   Value* basicBlockId = &*args++;
   Value* basicBlockInstCount = &*args++;
-
-  Value* counter = M.getGlobalVariable("instructionCounter");
-  if (!counter) {
-    errs() << "Global variable instructionCounter not found\n";
-  }
 
   std::string bbHookFunctionName = "";
   for (auto& function : M.getFunctionList()) {
@@ -79,6 +70,7 @@ Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
 
   builder.CreateCall(BBHookFunction, {
     basicBlockInstCount,
+    basicBlockId,
     ConstantInt::get(Int64Ty, threshold)
   });
 
@@ -117,51 +109,18 @@ void PhaseAnalysisPass::modifyROIFunctionsForBBV(Module &M) {
   if (!roiEnd) {
     errs() << "Function roi_end_ not found\n";
   }
-  Function* resetArrayFunction = M.getFunction("reset_array");
-  if (!resetArrayFunction) {
-    errs() << "Function reset_array not found\n";
+
+  Function* initArraysFunction = M.getFunction("init_arrays");
+  if (!initArraysFunction) {
+    errs() << "Function init_arrays not found\n";
   }
-  Function* writeSingleDataFunction = M.getFunction("write_single_data");
-  if (!writeSingleDataFunction) {
-    errs() << "Function write_single_data not found\n";
-  }
-  Function* writeArrayDataFunction = M.getFunction("write_array_data");
-  if (!writeArrayDataFunction) {
-    errs() << "Function write_array_data not found\n";
-  }
+
 
   IRBuilder<> builder(M.getContext());
 
   builder.SetInsertPoint(roiBegin->back().getTerminator());
-  builder.CreateCall(writeArrayDataFunction, {
-    builder.CreateGlobalStringPtr("basic block vector"),
-    M.getGlobalVariable("basicBlockVector"),
-    ConstantInt::get(Type::getInt32Ty(M.getContext()), totalBasicBlockCount)
-  });
-  // reset all global instruction counter and basic block distance counter
-  builder.CreateStore(
-    ConstantInt::get(Type::getInt64Ty(M.getContext()), 0), 
-    M.getGlobalVariable("instructionCounter"));
-  builder.CreateCall(resetArrayFunction, {
-    M.getGlobalVariable("basicBlockDist"),
-    ConstantInt::get(Type::getInt32Ty(M.getContext()), totalBasicBlockCount)
-  });
-
-  builder.SetInsertPoint(roiEnd->front().getFirstInsertionPt());
-  // write all stats
-  builder.CreateCall(writeSingleDataFunction, {
-    builder.CreateGlobalStringPtr("instructionCounter"),
-    builder.CreateLoad(Type::getInt64Ty(M.getContext()), M.getGlobalVariable("instructionCounter"))
-  });
-  builder.CreateCall(writeArrayDataFunction, {
-    builder.CreateGlobalStringPtr("basic block vector"),
-    M.getGlobalVariable("basicBlockVector"),
-    ConstantInt::get(Type::getInt32Ty(M.getContext()), totalBasicBlockCount)
-  });
-  builder.CreateCall(writeArrayDataFunction, {
-    builder.CreateGlobalStringPtr("basic block distance"),
-    M.getGlobalVariable("basicBlockDist"),
-    ConstantInt::get(Type::getInt32Ty(M.getContext()), totalBasicBlockCount)
+  builder.CreateCall(initArraysFunction, {
+    ConstantInt::get(Type::getInt64Ty(M.getContext()), totalBasicBlockCount)
   });
 
 }
@@ -245,15 +204,6 @@ Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
 
 void PhaseAnalysisPass::instrumentBBVAnalysis(Module &M) {
   IRBuilder<> builder(M.getContext());
-  // create arrays
-  GlobalVariable* basicBlockVector = createGlobalUint64Array(M, "basicBlockVector", totalBasicBlockCount);
-  if (!basicBlockVector) {
-    errs() << "Global variable basicBlockVector not found\n";
-  }
-  GlobalVariable* basicBlockDist = createGlobalUint64Array(M, "basicBlockDist", totalBasicBlockCount);
-  if (!basicBlockDist) {
-    errs() << "Global variable basicBlockDist not found\n";
-  }
 
   // Create the instrumentation function
   Function* instrumentationFunction = createBBVAnalysisFunction(M);
@@ -272,7 +222,7 @@ void PhaseAnalysisPass::instrumentBBVAnalysis(Module &M) {
 
   }
 
-  // modifyROIFunctionsForBBV(M);
+  modifyROIFunctionsForBBV(M);
 }
 
 void PhaseAnalysisPass::instrumentPapiAnalysis(Module &M) {
@@ -332,20 +282,6 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
 
   IRBuilder<> builder(M.getContext());
 
-  // Create a global variable to store the instruction count
-  Type *Int64Ty = Type::getInt64Ty(M.getContext());
-  GlobalVariable* instructionCounter = new GlobalVariable(
-    M,
-    Int64Ty,
-    false,
-    GlobalValue::ExternalLinkage,
-    ConstantInt::get(Int64Ty, 0),
-    "instructionCounter"
-  );
-  if (!instructionCounter) {
-    errs() << "Global variable instructionCounter not found\n";
-  }
-
   totalFunctionCount = 0;
   totalBasicBlockCount = 0;
 
@@ -364,7 +300,7 @@ PreservedAnalyses PhaseAnalysisPass::run(Module &M, ModuleAnalysisManager &AM)
 
     if (functionName.find("_GLOBAL__sub_I_") != std::string::npos ||
       functionName.find("__cxx_global_var_init") != std::string::npos ||
-      functionName.find("_ZNSt13__atomic_baseImEpLEm") != std::string::npos ||
+      functionName.find("_ZNSt13__atomic_") != std::string::npos ||
       functionName.find("_ZStanSt12memory_orderSt23__memory_order_modifier") != std::string::npos ||
       functionName.find("__clang_call_terminate") != std::string::npos ||
       functionName.find("_ZNSt13__atomic_baseImEaSEm") != std::string::npos) {
