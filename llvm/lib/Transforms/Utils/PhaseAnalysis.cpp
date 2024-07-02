@@ -216,7 +216,7 @@ void PhaseAnalysisPass::instrumentBBVAnalysis(Module &M) {
       builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
     }
     CallInst* main_instrument = builder.CreateCall(instrumentationFunction, {
-      ConstantInt::get(Type::getInt32Ty(M.getContext()), item.basicBlockId),
+      ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockId),
       ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
     });
 
