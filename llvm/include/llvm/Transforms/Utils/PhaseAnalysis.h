@@ -25,13 +25,13 @@ public:
   struct basicBlockInfo {
     // function related
     std::string functionName;
-    uint32_t functionId;
+    uint64_t functionId;
     bool ifStartOfFunction;
 
     // basic block related
     std::string basicBlockName;
     uint64_t basicBlockCount;
-    uint32_t basicBlockId;
+    uint64_t basicBlockId;
 
     // pointers to the basic block and function
     BasicBlock* basicBlock;
