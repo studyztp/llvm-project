@@ -24,7 +24,7 @@ public:
   struct basicBlockInfo {
     // function related
     std::string functionName;
-    uint32_t functionId;
+    uint64_t functionId;
     bool ifStartMark;
     bool ifEndMark;
     bool ifWarmupMark;
@@ -32,7 +32,7 @@ public:
     // basic block related
     std::string basicBlockName;
     uint64_t basicBlockCount;
-    uint32_t basicBlockId;
+    uint64_t basicBlockId;
 
     // pointers to the basic block and function
     BasicBlock* basicBlock;
@@ -54,12 +54,11 @@ public:
   uint64_t warmupMarkerBBId;
   uint64_t warmupMarkerCount;
   bool hasWarmupMarker = true;
+  bool foundStartMarker = false;
 
   void getInformation(Module &M);
   void formBasicBlockList(Module& M);
   bool emptyFunction(Function &F);
-  Function* createMarkerFunction(Module& M, std::string functionName,
-                                uint64_t threshold, std::string raiseFunction);
 
 public:
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
