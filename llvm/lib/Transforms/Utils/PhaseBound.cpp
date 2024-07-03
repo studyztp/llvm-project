@@ -70,8 +70,7 @@ void PhaseBoundPass::getInformation(Module &M) {
         if (!roiBegin) {
             errs() << "Function roi_begin_ not found\n";
         }
-        Function* warmupFunction = createMarkerFunction(M, \
-                        "warmup_function", warmupMarkerCount, "warmup_marker");
+        Function* warmUpMarkerHookFunction = M.getFunction("warmUpHook");
         IRBuilder<> builder(M.getContext());
         if (roiBegin->back().getTerminator()) {
             builder.SetInsertPoint(roiBegin->back().getTerminator());
@@ -79,8 +78,17 @@ void PhaseBoundPass::getInformation(Module &M) {
             errs() << "Could not find terminator point for roiBegin\n";
             builder.SetInsertPoint(roiBegin->back().getFirstInsertionPt());
         }
-        builder.CreateCall(warmupFunction);
-
+        builder.CreateCall(warmUpMarkerHookFunction);
+        if (startMarkerFunctionId == 0 
+                && startMarkerBBId == 0 
+                && startMarkerCount == 0) {
+            foundStartMarker = true;
+            Function* startMarkerHookFunction = M.getFunction("startHook");
+            if (!startMarkerHookFunction) {
+                errs() << "Function startHook not found\n";
+            }
+            builder.CreateCall(startMarkerHookFunction);
+        }
     } else {
         errs() << "warmupMarkerFunctionId: " << warmupMarkerFunctionId << "\n";
         errs() << "warmupMarkerBBId: " << warmupMarkerBBId << "\n";
@@ -153,6 +161,7 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
             basicBlock.function = &(*function);
 
             basicBlock.ifStartMark = (
+                !foundStartMarker &&
                 basicBlock.functionId == startMarkerFunctionId && 
                 basicBlock.basicBlockId == startMarkerBBId);
             
@@ -186,64 +195,8 @@ void PhaseBoundPass::formBasicBlockList(Module& M) {
     readThisFile.close(); 
 }
 
-Function* PhaseBoundPass::createMarkerFunction(Module& M, std::string functionName,
-                        uint64_t threshold, std::string raiseFunction) {
-    IRBuilder<> builder(M.getContext());
-    Type* Int64Ty = Type::getInt64Ty(M.getContext());
-    Type* Int1Ty = Type::getInt1Ty(M.getContext());
-    FunctionType* functionType = FunctionType::get(builder.getVoidTy(), {}, false);
-    Function* function = Function::Create(functionType, GlobalValue::ExternalLinkage, functionName, M);
-    BasicBlock* entry = BasicBlock::Create(M.getContext(), "entry", function);
-    BasicBlock* ifRasingBB = BasicBlock::Create(M.getContext(), "ifRasing", function);
-    BasicBlock* ifNotRasingBB = BasicBlock::Create(M.getContext(), "ifNotRasing", function);
-    BasicBlock* ifNotMeetBB = BasicBlock::Create(M.getContext(), "ifNotMeet", function);
-    BasicBlock* ifMeetBB = BasicBlock::Create(M.getContext(), "ifMeet", function);
-    builder.SetInsertPoint(entry);
-    GlobalVariable* counter = new GlobalVariable(
-        M,
-        Int64Ty,
-        false,
-        GlobalValue::ExternalLinkage,
-        ConstantInt::get(Int64Ty, 0),
-        functionName + "_instructionCounter"
-    );
-    GlobalVariable* ifRasing = new GlobalVariable(
-        M,
-        Int1Ty,
-        false,
-        GlobalValue::ExternalLinkage,
-        ConstantInt::get(Int1Ty, 1),
-        functionName + "ifRasingBool"
-    );
-    Function* raiseFunctionObject = M.getFunction(raiseFunction);
-    if(!raiseFunctionObject) {
-        errs() << raiseFunction <<" not found\n";
-    }
-    if(!counter) {
-        errs() << "counter not found\n";
-    }
-    Value *ifRasingValue = builder.CreateLoad(Int1Ty, ifRasing);
-    builder.CreateCondBr(ifRasingValue, ifRasingBB, ifNotRasingBB);
-    builder.SetInsertPoint(ifRasingBB);
-    Value* counterValue = builder.CreateLoad(Int64Ty, counter);
-    Value* newCounter = builder.CreateAdd(counterValue, ConstantInt::get(Int64Ty, 1));
-    builder.CreateStore(newCounter, counter);
-    newCounter = builder.CreateLoad(Int64Ty, counter);
-    builder.CreateCondBr(builder.CreateICmpSGE(newCounter, ConstantInt::get(Int64Ty, threshold)), ifMeetBB, ifNotMeetBB);
-    builder.SetInsertPoint(ifNotMeetBB);
-    builder.CreateRetVoid();
-    builder.SetInsertPoint(ifMeetBB);
-    builder.CreateCall(raiseFunctionObject);
-    builder.CreateStore(ConstantInt::get(Int1Ty, 0), ifRasing);
-    builder.CreateRetVoid();
-    builder.SetInsertPoint(ifNotRasingBB);
-    builder.CreateRetVoid();
-    return function;
-}
-
 PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM) 
 {
-
     std::error_code EC;
 
     raw_fd_ostream out(PhaseBoundOutputFilename.c_str(), EC, sys::fs::OF_Text);
@@ -258,40 +211,63 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
 
     formBasicBlockList(M);
 
+    Function *roiBegin = M.getFunction("roi_begin_");
+    if (!roiBegin) {
+        errs() << "Function roi_begin_ not found\n";
+    }
+    Function* setupThresholdsFunction = M.getFunction("setupThresholds");
+    if (!setupThresholdsFunction) {
+        errs() << "Function setupThresholds not found\n";
+    }
+    builder.SetInsertPoint(roiBegin->front().getFirstInsertionPt());
+    builder.CreateCall(setupThresholdsFunction, {
+        ConstantInt::get(Int64Ty, warmupMarkerCount),
+        ConstantInt::get(Int64Ty, startMarkerCount),
+        ConstantInt::get(Int64Ty, endMarkerCount)
+    });
 
     for (auto item : basicBlockList) {
         if(item.ifStartMark) {
             errs() << "Start marker found\n";
-            Function* startFunction = createMarkerFunction(M, "start_function", startMarkerCount, "start_marker");
+            Function* startMarkerHookFunction = M.getFunction("startHook");
+            if (!startMarkerHookFunction) {
+                errs() << "Function startHook not found\n";
+            }
             if (item.basicBlock->getTerminator()) {
                 builder.SetInsertPoint(item.basicBlock->getTerminator());
             } else {
                 errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
                 builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             }
-            builder.CreateCall(startFunction);
+            builder.CreateCall(startMarkerHookFunction);
         }
         if(item.ifEndMark) {
             errs() << "End marker found\n";
-            Function* endFunction = createMarkerFunction(M, "end_function", endMarkerCount, "end_marker");
+            Function* endMarkerHookFunction = M.getFunction("endHook");
+            if (!endMarkerHookFunction) {
+                errs() << "Function endHook not found\n";
+            }
             if (item.basicBlock->getTerminator()) {
                 builder.SetInsertPoint(item.basicBlock->getTerminator());
             } else {
                 errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
                 builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             }
-            builder.CreateCall(endFunction);
+            builder.CreateCall(endMarkerHookFunction);
         }
         if(item.ifWarmupMark) {
             errs() << "Warmup marker found\n";
-            Function* warmupFunction = createMarkerFunction(M, "warmup_function", warmupMarkerCount, "warmup_marker");
+            Function* warmUpMarkerHookFunction = M.getFunction("warmUpHook");
+            if (!warmUpMarkerHookFunction) {
+                errs() << "Function warmUpHook not found\n";
+            }
             if (item.basicBlock->getTerminator()) {
                 builder.SetInsertPoint(item.basicBlock->getTerminator());
             } else {
                 errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
                 builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             }
-            builder.CreateCall(warmupFunction);
+            builder.CreateCall(warmUpMarkerHookFunction);
         }
     }
 
