@@ -57,7 +57,6 @@ private:
   );
 
   void modifyROIFunctionsForBBV(Module &M);
-  void modifyROIFunctionsForPapi(Module &M);
 
   Function* createBBVAnalysisFunction(Module &M);
   Function* createPapiAnalysisFunction(Module &M);

@@ -125,22 +125,6 @@ void PhaseAnalysisPass::modifyROIFunctionsForBBV(Module &M) {
 
 }
 
-void PhaseAnalysisPass::modifyROIFunctionsForPapi(Module &M) {
-  Function* roiBegin = M.getFunction("roi_begin_");
-  if (!roiBegin) {
-    errs() << "Function roi_begin_ not found\n";
-  }
-
-  IRBuilder<> builder(M.getContext());
-
-  builder.SetInsertPoint(roiBegin->back().getTerminator());
-  // reset all global instruction counter and basic block distance counter
-  builder.CreateStore(
-    ConstantInt::get(Type::getInt64Ty(M.getContext()), 0), 
-    M.getGlobalVariable("instructionCounter"));
-
-}
-
 Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
   Type* VoidTy = Type::getVoidTy(M.getContext());
   Type* Int64Ty = Type::getInt64Ty(M.getContext());
@@ -155,48 +139,29 @@ Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
   F->addFnAttr(Attribute::NoProfile);
 
   BasicBlock* mainBB = BasicBlock::Create(M.getContext(), "instrumentation_entry", F);
-  BasicBlock* ifMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifMeet", F);
-  BasicBlock* ifNotMeet = BasicBlock::Create(M.getContext(), "instrumentation_ifNotMeet", F);
   IRBuilder<> builder(M.getContext());
 
   Function::arg_iterator args = F->arg_begin();
   Value* basicBlockInstCount = &*args;
 
-  Function* papiRegionBegin = M.getFunction("start_papi_region");
-  if (!papiRegionBegin) {
-    errs() << "Function start_region not found\n";
+  std::string bbHookFunctionName = "";
+  for (auto& function : M.getFunctionList()) {
+    if (function.getName().str().find("bb_hook") != std::string::npos) {
+      bbHookFunctionName = function.getName().str();
+    }
   }
 
-  Function* papiRegionEnd = M.getFunction("end_papi_region");
-  if (!papiRegionEnd) {
-    errs() << "Function end_region not found\n";
+  Function* BBHookFunction = M.getFunction(bbHookFunctionName);
+  if (!BBHookFunction) {
+    errs() << "Function " << bbHookFunctionName<< " not found\n";
   }
-
-  Value* counter = M.getGlobalVariable("instructionCounter");
-  if (!counter) {
-    errs() << "Global variable instructionCounter not found\n";
-  }
-
-  InlineFunctionInfo ifi;
 
   builder.SetInsertPoint(mainBB);
+  builder.CreateCall(BBHookFunction, {
+    basicBlockInstCount,
+    ConstantInt::get(Int64Ty, threshold)
+  });
 
-  Value* loadOldCounter = builder.CreateLoad(Int64Ty, counter);
-  Value* addResult = builder.CreateAdd(loadOldCounter, basicBlockInstCount);
-  builder.CreateStore(addResult, counter);
-
-  Value* ifReachThreshold = 
-      builder.CreateICmpSGE(addResult, ConstantInt::get(Int64Ty, threshold));
-  builder.CreateCondBr(ifReachThreshold, ifMeet, ifNotMeet);
-
-  builder.SetInsertPoint(ifMeet);
-  builder.CreateCall(papiRegionEnd);
-  builder.CreateCall(papiRegionBegin);
-  builder.CreateStore(ConstantInt::get(Int64Ty, 0), counter);
-
-  builder.CreateRetVoid(); 
-
-  builder.SetInsertPoint(ifNotMeet);
   builder.CreateRetVoid();
 
   return F;
@@ -243,9 +208,7 @@ void PhaseAnalysisPass::instrumentPapiAnalysis(Module &M) {
       ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
     });
   }
-
-  modifyROIFunctionsForPapi(M);
-
+  
 }
 
 cl::opt<std::string> PhaseAnalysisOutputFilename(
