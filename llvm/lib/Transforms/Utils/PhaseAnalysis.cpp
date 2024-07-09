@@ -12,94 +12,6 @@ bool PhaseAnalysisPass::emptyFunction(Function &F) {
   return count == 0;
 }
 
-GlobalVariable* PhaseAnalysisPass::createGlobalUint64Array(
-  Module& M,
-  std::string variableName,
-  uint64_t size) 
-{
-  ArrayType* arrayTy = ArrayType::get(IntegerType::get(M.getContext(), 64), 
-                                                                        size);
-
-  GlobalVariable* gvar_array = new GlobalVariable(
-    M,
-    arrayTy,
-    false,
-    GlobalValue::ExternalLinkage,
-    0,
-    variableName
-  );
-  ConstantAggregateZero* const_array = ConstantAggregateZero::get(arrayTy);
-  gvar_array->setInitializer(const_array);
-
-  return gvar_array;
-}
-
-Function* PhaseAnalysisPass::createBBVAnalysisFunction(Module &M) {
-  Type* VoidTy = Type::getVoidTy(M.getContext());
-  Type* Int64Ty = Type::getInt64Ty(M.getContext());
-  FunctionType* FTy = FunctionType::get(VoidTy, {Int64Ty, Int64Ty}, false);
-  Function* F = Function::Create(
-    FTy,
-    GlobalValue::ExternalLinkage,
-    "instrumentationFunction",
-    M
-  );
-  F->addFnAttr(Attribute::NoInline);
-  F->addFnAttr(Attribute::NoProfile);
-
-  BasicBlock* mainBB = BasicBlock::Create(M.getContext(), "instrumentation_entry", F);
-  IRBuilder<> builder(M.getContext());
-  builder.SetInsertPoint(mainBB);
-  Function::arg_iterator args = F->arg_begin();
-  Value* basicBlockId = &*args++;
-  Value* basicBlockInstCount = &*args++;
-
-  std::string bbHookFunctionName = "";
-  for (auto& function : M.getFunctionList()) {
-    if (function.getName().str().find("bb_hook") != std::string::npos) {
-      bbHookFunctionName = function.getName().str();
-    }
-  }
-
-  Function* BBHookFunction = M.getFunction(bbHookFunctionName);
-  if (!BBHookFunction) {
-    errs() << "Function " << bbHookFunctionName<< " not found\n";
-  }
-
-  InlineFunctionInfo ifi;
-
-  builder.CreateCall(BBHookFunction, {
-    basicBlockInstCount,
-    basicBlockId,
-    ConstantInt::get(Int64Ty, threshold)
-  });
-
-  builder.CreateRetVoid();
-
-  std::vector<CallInst*> calls;
-
-  for (auto& BB : *F) {
-    for (auto& I : BB) {
-      if (isa<CallInst>(&I)) {
-        std::string name = cast<CallInst>(&I)->getCalledFunction()->getName().str();
-        if (M.getFunction(name) && !M.getFunction(name)->hasFnAttribute(Attribute::NoInline)){
-          calls.push_back(cast<CallInst>(&I));
-        }
-      }
-    }
-  }
-
-  for (auto* call : calls) {
-    if(InlineFunction(*call, ifi).isSuccess()) {
-      errs() << "Successfully inlined function for" << call->getCalledFunction()->getName().str() << "\n";
-    } else {
-      errs() << "Failed to inline function for" << call->getCalledFunction()->getName().str() << "\n";
-    }
-  }
-
-  return F;
-}
-
 void PhaseAnalysisPass::modifyROIFunctionsForBBV(Module &M) {
   Function* roiBegin = M.getFunction("roi_begin_");
   if (!roiBegin) {
@@ -125,24 +37,8 @@ void PhaseAnalysisPass::modifyROIFunctionsForBBV(Module &M) {
 
 }
 
-Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
-  Type* VoidTy = Type::getVoidTy(M.getContext());
-  Type* Int64Ty = Type::getInt64Ty(M.getContext());
-  FunctionType* FTy = FunctionType::get(VoidTy, {Int64Ty}, false);
-  Function* F = Function::Create(
-    FTy,
-    GlobalValue::ExternalLinkage,
-    "instrumentationFunction",
-    M
-  );
-  F->addFnAttr(Attribute::NoInline);
-  F->addFnAttr(Attribute::NoProfile);
-
-  BasicBlock* mainBB = BasicBlock::Create(M.getContext(), "instrumentation_entry", F);
+void PhaseAnalysisPass::instrumentBBVAnalysis(Module &M) {
   IRBuilder<> builder(M.getContext());
-
-  Function::arg_iterator args = F->arg_begin();
-  Value* basicBlockInstCount = &*args;
 
   std::string bbHookFunctionName = "";
   for (auto& function : M.getFunctionList()) {
@@ -156,23 +52,6 @@ Function* PhaseAnalysisPass::createPapiAnalysisFunction(Module &M) {
     errs() << "Function " << bbHookFunctionName<< " not found\n";
   }
 
-  builder.SetInsertPoint(mainBB);
-  builder.CreateCall(BBHookFunction, {
-    basicBlockInstCount,
-    ConstantInt::get(Int64Ty, threshold)
-  });
-
-  builder.CreateRetVoid();
-
-  return F;
-}
-
-void PhaseAnalysisPass::instrumentBBVAnalysis(Module &M) {
-  IRBuilder<> builder(M.getContext());
-
-  // Create the instrumentation function
-  Function* instrumentationFunction = createBBVAnalysisFunction(M);
-
   for (auto item : basicBlockList) {
     if (item.basicBlock->getTerminator()) {
       builder.SetInsertPoint(item.basicBlock->getTerminator());
@@ -180,9 +59,10 @@ void PhaseAnalysisPass::instrumentBBVAnalysis(Module &M) {
       errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
       builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
     }
-    CallInst* main_instrument = builder.CreateCall(instrumentationFunction, {
+    CallInst* main_instrument = builder.CreateCall(BBHookFunction, {
       ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockId),
-      ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
+      ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount),
+      ConstantInt::get(Type::getInt64Ty(M.getContext()), threshold),
     });
 
   }
@@ -193,7 +73,17 @@ void PhaseAnalysisPass::instrumentBBVAnalysis(Module &M) {
 void PhaseAnalysisPass::instrumentPapiAnalysis(Module &M) {
   IRBuilder<> builder(M.getContext());
 
-  Function* instrumentationFunction = createPapiAnalysisFunction(M);
+  std::string bbHookFunctionName = "";
+  for (auto& function : M.getFunctionList()) {
+    if (function.getName().str().find("bb_hook") != std::string::npos) {
+      bbHookFunctionName = function.getName().str();
+    }
+  }
+
+  Function* BBHookFunction = M.getFunction(bbHookFunctionName);
+  if (!BBHookFunction) {
+    errs() << "Function " << bbHookFunctionName<< " not found\n";
+  }
 
   for (auto item : basicBlockList) {
     if (item.basicBlock->getTerminator()) {
@@ -204,8 +94,9 @@ void PhaseAnalysisPass::instrumentPapiAnalysis(Module &M) {
     }
         // Call the instrumentation function with the basic block count as the argument
         // (this is the number of instructions in the basic block
-    CallInst* main_instrument = builder.CreateCall(instrumentationFunction, {
-      ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount)
+    CallInst* main_instrument = builder.CreateCall(BBHookFunction, {
+      ConstantInt::get(Type::getInt64Ty(M.getContext()), item.basicBlockCount),
+      ConstantInt::get(Type::getInt64Ty(M.getContext()), threshold),
     });
   }
   
