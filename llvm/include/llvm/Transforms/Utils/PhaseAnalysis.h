@@ -48,17 +48,7 @@ private:
   // check if the function is empty by checking the number of 
   bool emptyFunction(Function &F);
 
-
-  GlobalVariable* createGlobalUint64Array(
-    Module& M,
-    std::string variableName,
-    uint64_t size
-  );
-
   void modifyROIFunctionsForBBV(Module &M);
-
-  Function* createBBVAnalysisFunction(Module &M);
-  Function* createPapiAnalysisFunction(Module &M);
 
   void instrumentBBVAnalysis(Module &M);
   void instrumentPapiAnalysis(Module &M);
