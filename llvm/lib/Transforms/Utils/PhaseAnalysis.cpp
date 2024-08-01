@@ -22,7 +22,7 @@ void PhaseAnalysisPass::modifyROIFunctionsForBBV(Module &M) {
     errs() << "Function roi_end_ not found\n";
   }
 
-  Function* initArraysFunction = M.getFunction("initArrays");
+  Function* initArraysFunction = M.getFunction("init_array");
   if (!initArraysFunction) {
     errs() << "Function init_arrays not found\n";
   }
@@ -42,7 +42,7 @@ void PhaseAnalysisPass::instrumentBBVAnalysis(Module &M) {
 
   std::string bbHookFunctionName = "";
   for (auto& function : M.getFunctionList()) {
-    if (function.getName().str().find("bbHook") != std::string::npos) {
+    if (function.getName().str().find("bb_hook") != std::string::npos) {
       bbHookFunctionName = function.getName().str();
     }
   }
@@ -75,7 +75,7 @@ void PhaseAnalysisPass::instrumentPapiAnalysis(Module &M) {
 
   std::string bbHookFunctionName = "";
   for (auto& function : M.getFunctionList()) {
-    if (function.getName().str().find("bbHook") != std::string::npos) {
+    if (function.getName().str().find("bb_hook") != std::string::npos) {
       bbHookFunctionName = function.getName().str();
     }
   }
