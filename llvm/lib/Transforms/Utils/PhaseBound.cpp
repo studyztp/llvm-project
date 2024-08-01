@@ -70,7 +70,7 @@ void PhaseBoundPass::getInformation(Module &M) {
         if (!roiBegin) {
             errs() << "Function roi_begin_ not found\n";
         }
-        Function* warmUpMarkerHookFunction = M.getFunction("warmUpHook");
+        Function* warmUpMarkerHookFunction = M.getFunction("warmup_hook");
         IRBuilder<> builder(M.getContext());
         if (roiBegin->back().getTerminator()) {
             builder.SetInsertPoint(roiBegin->back().getTerminator());
@@ -83,7 +83,7 @@ void PhaseBoundPass::getInformation(Module &M) {
                 && startMarkerBBId == 0 
                 && startMarkerCount == 0) {
             foundStartMarker = true;
-            Function* startMarkerHookFunction = M.getFunction("startHook");
+            Function* startMarkerHookFunction = M.getFunction("start_hook");
             if (!startMarkerHookFunction) {
                 errs() << "Function startHook not found\n";
             }
@@ -215,7 +215,7 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
     if (!roiBegin) {
         errs() << "Function roi_begin_ not found\n";
     }
-    Function* setupThresholdsFunction = M.getFunction("setupThresholds");
+    Function* setupThresholdsFunction = M.getFunction("setup_threshold");
     if (!setupThresholdsFunction) {
         errs() << "Function setupThresholds not found\n";
     }
@@ -229,7 +229,7 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
     for (auto item : basicBlockList) {
         if(item.ifStartMark) {
             errs() << "Start marker found\n";
-            Function* startMarkerHookFunction = M.getFunction("startHook");
+            Function* startMarkerHookFunction = M.getFunction("start_hook");
             if (!startMarkerHookFunction) {
                 errs() << "Function startHook not found\n";
             }
@@ -243,7 +243,7 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
         }
         if(item.ifEndMark) {
             errs() << "End marker found\n";
-            Function* endMarkerHookFunction = M.getFunction("endHook");
+            Function* endMarkerHookFunction = M.getFunction("end_hook");
             if (!endMarkerHookFunction) {
                 errs() << "Function endHook not found\n";
             }
@@ -257,7 +257,7 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
         }
         if(item.ifWarmupMark) {
             errs() << "Warmup marker found\n";
-            Function* warmUpMarkerHookFunction = M.getFunction("warmUpHook");
+            Function* warmUpMarkerHookFunction = M.getFunction("warmup_hook");
             if (!warmUpMarkerHookFunction) {
                 errs() << "Function warmUpHook not found\n";
             }
