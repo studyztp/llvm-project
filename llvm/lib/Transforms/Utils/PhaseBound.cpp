@@ -37,7 +37,7 @@ uint64_t readLineAsUInt64(std::ifstream& file) {
         errs() << "Could not read line\n";
         return 0;
     }
-    return static_cast<uint64_t>(std::stoi(line));
+    return static_cast<uint64_t>(std::stoull(line));
 }
 
 void PhaseBoundPass::getInformation(Module &M) {
