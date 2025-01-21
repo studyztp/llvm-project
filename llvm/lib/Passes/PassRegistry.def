@@ -143,6 +143,7 @@ MODULE_PASS("view-callgraph", CallGraphViewerPass())
 MODULE_PASS("wholeprogramdevirt", WholeProgramDevirtPass())
 MODULE_PASS("phase-analysis", PhaseAnalysisPass())
 MODULE_PASS("phase-bound", PhaseBoundPass())
+MODULE_PASS("comment-in-assembly", CommentInAssemblyPass())
 #undef MODULE_PASS
 
 #ifndef MODULE_PASS_WITH_PARAMS
