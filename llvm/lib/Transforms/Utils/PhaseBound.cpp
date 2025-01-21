@@ -31,6 +31,12 @@ cl::opt<std::string> PhaseBoundOutputFilename(
     cl::ValueRequired
 );
 
+cl::opt<std::string> PhaseBoundLabelOnly(
+    "phase-bound-label-only", 
+    cl::init("false"),
+    cl::desc("<true/false>")
+);
+
 uint64_t readLineAsUInt64(std::ifstream& file) {
     std::string line;
     if (!std::getline(file, line)) {
@@ -204,6 +210,10 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
         errs() << "Could not open file: " << EC.message() << "\n";
     }
 
+    if (strcmp(PhaseBoundLabelOnly.c_str(), "true") == 0) {
+        labelOnly = true;
+    }
+
     getInformation(M);
 
     IRBuilder<> builder(M.getContext());
@@ -211,28 +221,63 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
 
     formBasicBlockList(M);
 
-    Function *roiBegin = M.getFunction("roi_begin_");
-    if (!roiBegin) {
-        errs() << "Function roi_begin_ not found\n";
+    if (!labelOnly) {
+        Function *roiBegin = M.getFunction("roi_begin_");
+        if (!roiBegin) {
+            errs() << "Function roi_begin_ not found\n";
+        }
+        Function* setupThresholdsFunction = M.getFunction("setup_threshold");
+        if (!setupThresholdsFunction) {
+            errs() << "Function setupThresholds not found\n";
+        }
+        builder.SetInsertPoint(roiBegin->front().getFirstInsertionPt());
+        builder.CreateCall(setupThresholdsFunction, {
+            ConstantInt::get(Int64Ty, warmupMarkerCount),
+            ConstantInt::get(Int64Ty, startMarkerCount),
+            ConstantInt::get(Int64Ty, endMarkerCount)
+        });
     }
-    Function* setupThresholdsFunction = M.getFunction("setup_threshold");
-    if (!setupThresholdsFunction) {
-        errs() << "Function setupThresholds not found\n";
+
+    if (labelOnly) {
+        Function* startMarkerHookFunction = FunctionType::get(builder.getVoidTy(), false);
+        InlineAsm *IA = InlineAsm::get(Ty, 
+            "Start Marker:\n\t",            // Label the current location
+            "",                             
+            /*hasSideEffects*/ true,
+            /*isAlignStack*/ false,
+            InlineAsm::AD_ATT);   
+        Function* endMarkerHookFunction = FunctionType::get(builder.getVoidTy(), false);
+        InlineAsm *IA = InlineAsm::get(Ty, 
+            "End Marker:\n\t",            // Label the current location
+            "",                             
+            /*hasSideEffects*/ true,
+            /*isAlignStack*/ false,
+            InlineAsm::AD_ATT);
+        Function* warmupMarkerHookFunction = FunctionType::get(builder.getVoidTy(), false);
+        InlineAsm *IA = InlineAsm::get(Ty, 
+            "Warmup Marker:\n\t",            // Label the current location
+            "",                             
+            /*hasSideEffects*/ true,
+            /*isAlignStack*/ false,
+            InlineAsm::AD_ATT);
+    } else {
+        Function* startMarkerHookFunction = M.getFunction("start_hook");
+        if (!startMarkerHookFunction) {
+            errs() << "Function startHook not found\n";
+        }
+        Function* endMarkerHookFunction = M.getFunction("end_hook");
+        if (!endMarkerHookFunction) {
+            errs() << "Function endHook not found\n";
+        }
+        Function* warmupMarkerHookFunction = M.getFunction("warmup_hook");
+        if (!warmupMarkerHookFunction) {
+            errs() << "Function warmUpHook not found\n";
+        }
     }
-    builder.SetInsertPoint(roiBegin->front().getFirstInsertionPt());
-    builder.CreateCall(setupThresholdsFunction, {
-        ConstantInt::get(Int64Ty, warmupMarkerCount),
-        ConstantInt::get(Int64Ty, startMarkerCount),
-        ConstantInt::get(Int64Ty, endMarkerCount)
-    });
 
     for (auto item : basicBlockList) {
         if(item.ifStartMark) {
             errs() << "Start marker found\n";
-            Function* startMarkerHookFunction = M.getFunction("start_hook");
-            if (!startMarkerHookFunction) {
-                errs() << "Function startHook not found\n";
-            }
             if (item.basicBlock->getTerminator()) {
                 builder.SetInsertPoint(item.basicBlock->getTerminator());
             } else {
@@ -243,10 +288,6 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
         }
         if(item.ifEndMark) {
             errs() << "End marker found\n";
-            Function* endMarkerHookFunction = M.getFunction("end_hook");
-            if (!endMarkerHookFunction) {
-                errs() << "Function endHook not found\n";
-            }
             if (item.basicBlock->getTerminator()) {
                 builder.SetInsertPoint(item.basicBlock->getTerminator());
             } else {
@@ -257,10 +298,6 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
         }
         if(item.ifWarmupMark) {
             errs() << "Warmup marker found\n";
-            Function* warmUpMarkerHookFunction = M.getFunction("warmup_hook");
-            if (!warmUpMarkerHookFunction) {
-                errs() << "Function warmUpHook not found\n";
-            }
             if (item.basicBlock->getTerminator()) {
                 builder.SetInsertPoint(item.basicBlock->getTerminator());
             } else {

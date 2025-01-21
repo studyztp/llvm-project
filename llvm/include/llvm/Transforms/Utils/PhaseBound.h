@@ -55,6 +55,7 @@ public:
   uint64_t warmupMarkerCount;
   bool hasWarmupMarker = true;
   bool foundStartMarker = false;
+  bool labelOnly = false;
 
   void getInformation(Module &M);
   void formBasicBlockList(Module& M);
