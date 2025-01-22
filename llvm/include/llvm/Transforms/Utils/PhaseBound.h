@@ -56,6 +56,9 @@ public:
   bool hasWarmupMarker = true;
   bool foundStartMarker = false;
   bool labelOnly = false;
+  bool labelWarmup = true;
+
+  InlineAsm::AsmDialect labelTarget;
 
   void getInformation(Module &M);
   void formBasicBlockList(Module& M);
