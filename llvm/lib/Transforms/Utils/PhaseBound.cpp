@@ -43,6 +43,12 @@ cl::opt<std::string> PhaseBoundLabelTarget(
     cl::desc("<x86_64/aarch64/riscv64>")
 );
 
+cl::opt<std::string> PhaseBoundLabelWarmup(
+    "phase-bound-label-warmup", 
+    cl::init("true"),
+    cl::desc("<true/false>")
+);
+
 uint64_t readLineAsUInt64(std::ifstream& file) {
     std::string line;
     if (!std::getline(file, line)) {
@@ -218,9 +224,10 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
 
     if (strcmp(PhaseBoundLabelOnly.c_str(), "true") == 0) {
         labelOnly = true;
+        if (strcmp(PhaseBoundLabelWarmup.c_str(), "false") == 0) {
+            labelWarmup = false;
+        }
     }
-
-    InlineAsm::AsmDialect labelTarget;
 
     if (strcmp(PhaseBoundLabelTarget.c_str(), "x86_64") == 0) {
         labelTarget = InlineAsm::AD_ATT;
@@ -239,7 +246,7 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
 
     formBasicBlockList(M);
 
-    if (!labelOnly) {
+    if (!labelOnly || !labelWarmup) {
         Function *roiBegin = M.getFunction("roi_begin_");
         if (!roiBegin) {
             errs() << "Function roi_begin_ not found\n";
@@ -269,6 +276,7 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
             }
             if (labelOnly) {
                 errs() << "Label only\n";
+                errs() << "Target: " << labelTarget << "\n";
                 InlineAsm *StartIA = InlineAsm::get(Ty, 
                     "Start_Marker:\n\t",            // Label the current location
                     "",                             
@@ -294,6 +302,7 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
             }
             if (labelOnly) {
                 errs() << "Label only\n";
+                errs() << "Target: " << labelTarget << "\n";
                 InlineAsm *EndIA = InlineAsm::get(Ty, 
                     "End_Marker:\n\t",            // Label the current location
                     "",                             
@@ -317,8 +326,9 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
                 errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
                 builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             }
-            if (labelOnly) {
+            if (labelOnly && labelWarmup) {
                 errs() << "Label only\n";
+                errs() << "Target: " << labelTarget << "\n";
                 InlineAsm *WarmupIA = InlineAsm::get(Ty, 
                     "Warmup_Marker:\n\t",            // Label the current location
                     "",                             
