@@ -238,42 +238,7 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
         });
     }
 
-    if (labelOnly) {
-        Function* startMarkerHookFunction = FunctionType::get(builder.getVoidTy(), false);
-        InlineAsm *IA = InlineAsm::get(Ty, 
-            "Start Marker:\n\t",            // Label the current location
-            "",                             
-            /*hasSideEffects*/ true,
-            /*isAlignStack*/ false,
-            InlineAsm::AD_ATT);   
-        Function* endMarkerHookFunction = FunctionType::get(builder.getVoidTy(), false);
-        InlineAsm *IA = InlineAsm::get(Ty, 
-            "End Marker:\n\t",            // Label the current location
-            "",                             
-            /*hasSideEffects*/ true,
-            /*isAlignStack*/ false,
-            InlineAsm::AD_ATT);
-        Function* warmupMarkerHookFunction = FunctionType::get(builder.getVoidTy(), false);
-        InlineAsm *IA = InlineAsm::get(Ty, 
-            "Warmup Marker:\n\t",            // Label the current location
-            "",                             
-            /*hasSideEffects*/ true,
-            /*isAlignStack*/ false,
-            InlineAsm::AD_ATT);
-    } else {
-        Function* startMarkerHookFunction = M.getFunction("start_hook");
-        if (!startMarkerHookFunction) {
-            errs() << "Function startHook not found\n";
-        }
-        Function* endMarkerHookFunction = M.getFunction("end_hook");
-        if (!endMarkerHookFunction) {
-            errs() << "Function endHook not found\n";
-        }
-        Function* warmupMarkerHookFunction = M.getFunction("warmup_hook");
-        if (!warmupMarkerHookFunction) {
-            errs() << "Function warmUpHook not found\n";
-        }
-    }
+    FunctionType* Ty = FunctionType::get(builder.getVoidTy(), false);
 
     for (auto item : basicBlockList) {
         if(item.ifStartMark) {
@@ -284,7 +249,22 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
                 errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
                 builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             }
-            builder.CreateCall(startMarkerHookFunction);
+            if (labelOnly) {
+                errors() << "Label only\n";
+                InlineAsm *StartIA = InlineAsm::get(Ty, 
+                    "Start_Marker:\n\t",            // Label the current location
+                    "",                             
+                    /*hasSideEffects*/ true,
+                    /*isAlignStack*/ false,
+                    InlineAsm::AD_ATT);
+                builder.CreateCall(StartIA);
+            } else {
+                Function* startMarkerHookFunction = M.getFunction("start_hook");
+                if (!startMarkerHookFunction) {
+                    errs() << "Function startHook not found\n";
+                }
+                builder.CreateCall(startMarkerHookFunction);
+            }
         }
         if(item.ifEndMark) {
             errs() << "End marker found\n";
@@ -294,7 +274,22 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
                 errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
                 builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             }
-            builder.CreateCall(endMarkerHookFunction);
+            if (labelOnly) {
+                errors() << "Label only\n";
+                InlineAsm *EndIA = InlineAsm::get(Ty, 
+                    "End_Marker:\n\t",            // Label the current location
+                    "",                             
+                    /*hasSideEffects*/ true,
+                    /*isAlignStack*/ false,
+                    InlineAsm::AD_ATT);
+                builder.CreateCall(EndIA);
+            } else {
+                Function* endMarkerHookFunction = M.getFunction("end_hook");
+                if (!endMarkerHookFunction) {
+                    errs() << "Function endHook not found\n";
+                }
+                builder.CreateCall(endMarkerHookFunction);
+            }
         }
         if(item.ifWarmupMark) {
             errs() << "Warmup marker found\n";
@@ -304,7 +299,22 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
                 errs() << "Could not find terminator point for fucntion " << item.functionName << " bbid " << item.basicBlockId << "\n";
                 builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             }
-            builder.CreateCall(warmUpMarkerHookFunction);
+            if (labelOnly) {
+                errors() << "Label only\n";
+                InlineAsm *WarmupIA = InlineAsm::get(Ty, 
+                    "Warmup_Marker:\n\t",            // Label the current location
+                    "",                             
+                    /*hasSideEffects*/ true,
+                    /*isAlignStack*/ false,
+                    InlineAsm::AD_ATT);
+                builder.CreateCall(WarmupIA);
+            } else {
+                Function* warmupMarkerHookFunction = M.getFunction("warmup_hook");
+                if (!warmupMarkerHookFunction) {
+                    errs() << "Function warmupHook not found\n";
+                }
+                builder.CreateCall(warmupMarkerHookFunction);
+            }
         }
     }
 
