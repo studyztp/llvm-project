@@ -37,6 +37,12 @@ cl::opt<std::string> PhaseBoundLabelOnly(
     cl::desc("<true/false>")
 );
 
+cl::opt<std::string> PhaseBoundLabelTarget(
+    "phase-bound-label-target", 
+    cl::init("x86_64"),
+    cl::desc("<x86_64/aarch64/riscv64>")
+);
+
 uint64_t readLineAsUInt64(std::ifstream& file) {
     std::string line;
     if (!std::getline(file, line)) {
@@ -214,6 +220,18 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
         labelOnly = true;
     }
 
+    InlineAsm::AsmDialect labelTarget;
+
+    if (strcmp(PhaseBoundLabelTarget.c_str(), "x86_64") == 0) {
+        labelTarget = InlineAsm::AD_ATT;
+    } else if (strcmp(PhaseBoundLabelTarget.c_str(), "aarch64") == 0) {
+        labelTarget = InlineAsm::AD_Intel;
+    } else if (strcmp(PhaseBoundLabelTarget.c_str(), "riscv64") == 0) {
+        labelTarget = InlineAsm::AD_ATT;
+    } else {
+        errs() << "Invalid label target\n";
+    }
+
     getInformation(M);
 
     IRBuilder<> builder(M.getContext());
@@ -250,13 +268,13 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
                 builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             }
             if (labelOnly) {
-                errors() << "Label only\n";
+                errs() << "Label only\n";
                 InlineAsm *StartIA = InlineAsm::get(Ty, 
                     "Start_Marker:\n\t",            // Label the current location
                     "",                             
                     /*hasSideEffects*/ true,
                     /*isAlignStack*/ false,
-                    InlineAsm::AD_ATT);
+                    labelTarget);
                 builder.CreateCall(StartIA);
             } else {
                 Function* startMarkerHookFunction = M.getFunction("start_hook");
@@ -275,13 +293,13 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
                 builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             }
             if (labelOnly) {
-                errors() << "Label only\n";
+                errs() << "Label only\n";
                 InlineAsm *EndIA = InlineAsm::get(Ty, 
                     "End_Marker:\n\t",            // Label the current location
                     "",                             
                     /*hasSideEffects*/ true,
                     /*isAlignStack*/ false,
-                    InlineAsm::AD_ATT);
+                    labelTarget);
                 builder.CreateCall(EndIA);
             } else {
                 Function* endMarkerHookFunction = M.getFunction("end_hook");
@@ -300,13 +318,13 @@ PreservedAnalyses PhaseBoundPass::run(Module &M, ModuleAnalysisManager &AM)
                 builder.SetInsertPoint(item.basicBlock->getFirstInsertionPt());
             }
             if (labelOnly) {
-                errors() << "Label only\n";
+                errs() << "Label only\n";
                 InlineAsm *WarmupIA = InlineAsm::get(Ty, 
                     "Warmup_Marker:\n\t",            // Label the current location
                     "",                             
                     /*hasSideEffects*/ true,
                     /*isAlignStack*/ false,
-                    InlineAsm::AD_ATT);
+                    labelTarget);
                 builder.CreateCall(WarmupIA);
             } else {
                 Function* warmupMarkerHookFunction = M.getFunction("warmup_hook");
