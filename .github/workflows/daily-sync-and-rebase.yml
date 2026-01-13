@@ -1,0 +1,101 @@
+name: Push-triggered rebase (main=>llvm upstream, others=>origin/main)
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rebase-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rebase:
+    # Don’t re-run on the bot’s own push
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      UPSTREAM_REPO: llvm/llvm-project
+      UPSTREAM_BRANCH: main
+      MAIN_BRANCH: main
+      GIT_TERMINAL_PROMPT: "0"
+
+    steps:
+      - name: Checkout repo (full history, blobless)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch latest origin refs we depend on
+        run: |
+          set -euo pipefail
+          BRANCH="${GITHUB_REF_NAME}"
+
+          # Always need origin/main as base for non-main branches
+          git fetch --no-tags origin "${MAIN_BRANCH}:refs/remotes/origin/${MAIN_BRANCH}"
+
+          # Also need the pushed branch ref (for correct lease + latest content)
+          git fetch --no-tags origin "${BRANCH}:refs/remotes/origin/${BRANCH}"
+
+      - name: Fetch upstream llvm main (only when rebasing main)
+        if: ${{ github.ref_name == 'main' }}
+        run: |
+          set -euo pipefail
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch --no-tags --prune --filter=blob:none \
+            upstream "${UPSTREAM_BRANCH}:refs/remotes/upstream/${UPSTREAM_BRANCH}"
+
+      - name: Reset to latest origin/<branch> then rebase on the right base
+        run: |
+          set -euo pipefail
+          BRANCH="${GITHUB_REF_NAME}"
+
+          # Start from the latest remote branch tip, not the event SHA
+          git checkout -B "${BRANCH}" "origin/${BRANCH}"
+
+          if [ "${BRANCH}" = "${MAIN_BRANCH}" ]; then
+            BASE="upstream/${UPSTREAM_BRANCH}"
+          else
+            BASE="origin/${MAIN_BRANCH}"
+          fi
+
+          echo "Rebasing ${BRANCH} onto ${BASE}"
+          git rebase "${BASE}" || {
+            echo "Rebase failed (conflicts). Aborting."
+            git status --porcelain
+            git rebase --abort || true
+            exit 1
+          }
+
+      - name: Push with PAT using explicit lease
+        env:
+          PAT: ${{ secrets.SYNC_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PAT}" ]; then
+            echo "ERROR: Missing repo secret SYNC_PAT (classic PAT with repo + workflow)."
+            exit 1
+          fi
+
+          BRANCH="${GITHUB_REF_NAME}"
+          REMOTE_URL="https://x-access-token:${PAT}@github.com/${{ github.repository }}.git"
+
+          # Expected remote head (fresh from our fetch step)
+          EXPECTED="$(git rev-parse "refs/remotes/origin/${BRANCH}")"
+          echo "Lease expects origin/${BRANCH} = ${EXPECTED}"
+
+          # Push HEAD -> branch, but only if remote still equals EXPECTED
+          git push "${REMOTE_URL}" "HEAD:refs/heads/${BRANCH}" \
+            --force-with-lease="refs/heads/${BRANCH}:${EXPECTED}"
