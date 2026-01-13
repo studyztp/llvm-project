@@ -68,6 +68,8 @@ add_llvm_component_library(LLVMTransformUtils
   ModuleUtils.cpp
   MoveAutoInit.cpp
   NameAnonGlobals.cpp
+  PhaseAnalysis.cpp
+  PhaseBound.cpp
   PredicateInfo.cpp
   ProfileVerify.cpp
   PromoteMemoryToRegister.cpp
